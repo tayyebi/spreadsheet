@@ -110,4 +110,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 else()
     # libX11 — the client-side X11 library (XOpenDisplay, XCreateWindow, …)
     target_link_libraries(spreadsheet PRIVATE X11)
+    # Statically bundle the C++ runtime so the binary does not depend on the
+    # host system's libstdc++/libgcc version (avoids GLIBCXX_x.y.z not found).
+    target_link_options(spreadsheet PRIVATE -static-libstdc++ -static-libgcc)
 endif()

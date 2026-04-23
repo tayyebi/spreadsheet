@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             artifact: spreadsheet-linux
             binary: build/spreadsheet
           - os: windows-latest
