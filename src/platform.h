@@ -3,7 +3,7 @@
 #include <functional>    // std::function
 #include <cstdint>       // uint8_t
 
-// Simple RGB colour value
+// Simple RGB color value
 struct Color {
     uint8_t r{0}; // red channel
     uint8_t g{0}; // green channel
@@ -23,7 +23,7 @@ class IWindow {
 public:
     virtual ~IWindow() = default; // virtual destructor
 
-    // Draw a text string at pixel position (x,y) in the given colour
+    // Draw a text string at pixel position (x,y) in the given color
     virtual void drawText(int x, int y, const std::string& text, Color c) = 0;
 
     // Draw the outline of a rectangle

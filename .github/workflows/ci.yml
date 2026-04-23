@@ -2,6 +2,9 @@ name: CI
 
 on: [push, pull_request] # trigger on push and PR
 
+permissions:
+  contents: read # minimal GITHUB_TOKEN permissions
+
 jobs:
   build:
     strategy:

@@ -17,15 +17,15 @@ class X11Window : public IWindow { // X11/Xlib implementation of IWindow
     std::function<void(KeyEvent)> keyCb_; // registered key-event callback
     std::function<void()>         redrawCb_; // called on Expose events
 
-    // Allocate an X11 colour and set it as the GC foreground
+    // Allocate an X11 color and set it as the GC foreground
     void setFg(Color c) {
-        XColor xc{};                                  // initialise colour struct
+        XColor xc{};                                  // initialize color struct
         xc.red   = static_cast<unsigned short>(c.r * 257u); // 8-bit -> 16-bit
         xc.green = static_cast<unsigned short>(c.g * 257u); // scale green
         xc.blue  = static_cast<unsigned short>(c.b * 257u); // scale blue
         xc.flags = DoRed | DoGreen | DoBlue;          // use all channels
         Colormap cm = DefaultColormap(dpy_, DefaultScreen(dpy_)); // get colormap
-        XAllocColor(dpy_, cm, &xc);                   // allocate closest colour
+        XAllocColor(dpy_, cm, &xc);                   // allocate closest color
         XSetForeground(dpy_, gc_, xc.pixel);           // apply to GC
     }
 
@@ -38,8 +38,8 @@ public:
             dpy_, RootWindow(dpy_, scr),              // parent = root
             0, 0, static_cast<unsigned>(w), static_cast<unsigned>(h), // geometry
             1,                                        // border width
-            BlackPixel(dpy_, scr),                    // border colour
-            WhitePixel(dpy_, scr));                   // background colour
+            BlackPixel(dpy_, scr),                    // border color
+            WhitePixel(dpy_, scr));                   // background color
         XSelectInput(dpy_, win_,                      // subscribe to events
             ExposureMask | KeyPressMask);              // expose + key input
         XStoreName(dpy_, win_, "Spreadsheet");         // window title
@@ -60,14 +60,14 @@ public:
     }
 
     void drawText(int x, int y, const std::string& text, Color c) override {
-        setFg(c);                                              // set text colour
+        setFg(c);                                              // set text color
         XDrawString(dpy_, buf_, gc_,                          // draw to back buffer
             x, y + 12,                                        // baseline offset +12px
             text.c_str(), static_cast<int>(text.size()));     // text data
     }
 
     void drawRect(int x, int y, int w, int h, Color c) override {
-        setFg(c); // set outline colour
+        setFg(c); // set outline color
         XDrawRectangle(dpy_, buf_, gc_,              // draw hollow rectangle
             x, y,                                    // top-left corner
             static_cast<unsigned>(w - 1),            // width (exclusive)
@@ -75,7 +75,7 @@ public:
     }
 
     void fillRect(int x, int y, int w, int h, Color c) override {
-        setFg(c); // set fill colour
+        setFg(c); // set fill color
         XFillRectangle(dpy_, buf_, gc_,              // fill solid rectangle
             x, y,
             static_cast<unsigned>(w),

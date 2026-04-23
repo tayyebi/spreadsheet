@@ -65,14 +65,14 @@ public:
     // Allocate (or reallocate) the off-screen CG bitmap context
     void createBackBuffer(int w, int h) {
         if (cgCtx_) CGContextRelease(cgCtx_); // release old context
-        CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB(); // RGB colour space
+        CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB(); // RGB color space
         cgCtx_ = CGBitmapContextCreate(       // allocate bitmap memory
             nullptr,                          // let CG manage memory
             static_cast<size_t>(w),           // width in pixels
             static_cast<size_t>(h),           // height in pixels
             8,                                // bits per channel
             0,                                // bytes per row (auto)
-            cs,                               // colour space
+            cs,                               // color space
             kCGImageAlphaPremultipliedLast);  // RGBA premultiplied
         CGColorSpaceRelease(cs);              // balance retain
     }
@@ -96,8 +96,8 @@ public:
         CGFloat r = c.r / 255.0f;                    // red component
         CGFloat g = c.g / 255.0f;                    // green component
         CGFloat b = c.b / 255.0f;                    // blue component
-        CGColorRef col = CGColorCreateGenericRGB(r, g, b, 1.0); // text colour
-        CFAttributedStringSetAttribute(as,           // apply colour
+        CGColorRef col = CGColorCreateGenericRGB(r, g, b, 1.0); // text color
+        CFAttributedStringSetAttribute(as,           // apply color
             CFRangeMake(0, CFStringGetLength(cfStr)),
             kCTForegroundColorAttributeName, col);
         CTLineRef line = CTLineCreateWithAttributedString(as); // create line
@@ -107,7 +107,7 @@ public:
             static_cast<CGFloat>(height_ - y - 13)); // baseline offset
         CTLineDraw(line, cgCtx_);                    // render glyphs
         CFRelease(line);                             // release line
-        CGColorRelease(col);                         // release colour
+        CGColorRelease(col);                         // release color
         CFRelease(font);                             // release font
         CFRelease(as);                               // release attributed string
         CFRelease(cfStr);                            // release CF string
@@ -116,7 +116,7 @@ public:
     void drawRect(int x, int y, int w, int h, Color c) override {
         if (!cgCtx_) return;                         // guard
         CGContextSaveGState(cgCtx_);                 // save state
-        CGContextSetRGBStrokeColor(cgCtx_,           // set stroke colour
+        CGContextSetRGBStrokeColor(cgCtx_,           // set stroke color
             c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, 1.0f);
         CGContextSetLineWidth(cgCtx_, 1.0f);         // 1-pixel line
         CGRect r = CGRectMake(                       // flipped rect (CG Y up)
@@ -131,7 +131,7 @@ public:
     void fillRect(int x, int y, int w, int h, Color c) override {
         if (!cgCtx_) return;                         // guard
         CGContextSaveGState(cgCtx_);                 // save state
-        CGContextSetRGBFillColor(cgCtx_,             // set fill colour
+        CGContextSetRGBFillColor(cgCtx_,             // set fill color
             c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, 1.0f);
         CGRect r = CGRectMake(                       // flipped rect
             static_cast<CGFloat>(x),
@@ -204,7 +204,7 @@ public:
 - (instancetype)initWithFrame:(NSRect)f macWin:(MacWindow*)mw {
     self = [super initWithFrame:f]; // call NSView init
     if (self) macWin_ = mw;         // store C++ pointer
-    return self;                    // return initialised view
+    return self;                    // return initialized view
 }
 
 - (void)drawRect:(NSRect)__unused dirtyRect { // render callback from Cocoa

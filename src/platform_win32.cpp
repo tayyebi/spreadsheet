@@ -73,7 +73,7 @@ public:
     }
 
     void drawText(int x, int y, const std::string& text, Color c) override {
-        SetTextColor(memDC_, toCR(c));               // set text colour
+        SetTextColor(memDC_, toCR(c));               // set text color
         SetBkMode(memDC_, TRANSPARENT);              // no background fill
         TextOutA(memDC_, x, y,                       // draw to back buffer
             text.c_str(), static_cast<int>(text.size())); // text data
