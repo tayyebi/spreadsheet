@@ -1,147 +1,37 @@
-#include "platform.h" // IWindow, Color, KeyEvent
-#include "app.h"      // App class
-#include <X11/Xlib.h>   // X11 core API
-#include <X11/Xutil.h>  // XLookupString
-#include <X11/keysym.h> // XK_* key symbol constants
-#include <stdexcept>    // std::runtime_error
-#include <cstring>      // memset
-#include <functional>   // std::function
-
-class X11Window : public IWindow { // X11/Xlib implementation of IWindow
-    Display*  dpy_{nullptr};  // connection to X server
-    Window    win_{0};        // X11 window ID
-    Pixmap    buf_{0};        // off-screen double-buffer pixmap
-    GC        gc_{nullptr};   // reusable graphics context
-    int       width_{0};      // window width in pixels
-    int       height_{0};     // window height in pixels
-    std::function<void(KeyEvent)> keyCb_; // registered key-event callback
-    std::function<void()>         redrawCb_; // called on Expose events
-
-    // Allocate an X11 color and set it as the GC foreground
-    void setFg(Color c) {
-        XColor xc{};                                  // initialize color struct
-        xc.red   = static_cast<unsigned short>(c.r * 257u); // 8-bit -> 16-bit
-        xc.green = static_cast<unsigned short>(c.g * 257u); // scale green
-        xc.blue  = static_cast<unsigned short>(c.b * 257u); // scale blue
-        xc.flags = DoRed | DoGreen | DoBlue;          // use all channels
-        Colormap cm = DefaultColormap(dpy_, DefaultScreen(dpy_)); // get colormap
-        XAllocColor(dpy_, cm, &xc);                   // allocate closest color
-        XSetForeground(dpy_, gc_, xc.pixel);           // apply to GC
-    }
-
+#include "platform.h" // hdr
+#include "app.h" // App
+#include <X11/Xlib.h> // X11
+#include <X11/Xutil.h> // lookup
+#include <X11/keysym.h> // XK_*
+#include <stdexcept> // error
+class X11Win:public IWindow{ // X11 impl
+    Display*dpy=nullptr;Window win=0;Pixmap buf=0;GC gc=nullptr;int W,H; // state
+    std::function<void(KeyEvent)>kcb;std::function<void()>rcb; // cbs
+    void fg(Color c){XColor x{};x.red=c.r*257u;x.green=c.g*257u;x.blue=c.b*257u;x.flags=DoRed|DoGreen|DoBlue;XAllocColor(dpy,DefaultColormap(dpy,DefaultScreen(dpy)),&x);XSetForeground(dpy,gc,x.pixel);} // fg color
 public:
-    X11Window(int w, int h) : width_(w), height_(h) { // constructor
-        dpy_ = XOpenDisplay(nullptr);                 // open default display
-        if (!dpy_) throw std::runtime_error("XOpenDisplay failed"); // check
-        int scr = DefaultScreen(dpy_);                // default screen index
-        win_ = XCreateSimpleWindow(                   // create top-level window
-            dpy_, RootWindow(dpy_, scr),              // parent = root
-            0, 0, static_cast<unsigned>(w), static_cast<unsigned>(h), // geometry
-            1,                                        // border width
-            BlackPixel(dpy_, scr),                    // border color
-            WhitePixel(dpy_, scr));                   // background color
-        XSelectInput(dpy_, win_,                      // subscribe to events
-            ExposureMask | KeyPressMask);              // expose + key input
-        XStoreName(dpy_, win_, "Spreadsheet");         // window title
-        XMapWindow(dpy_, win_);                       // make visible
-        XFlush(dpy_);                                 // flush to server
-        gc_  = XCreateGC(dpy_, win_, 0, nullptr);     // create graphics context
-        buf_ = XCreatePixmap(                         // create back-buffer pixmap
-            dpy_, win_,
-            static_cast<unsigned>(w), static_cast<unsigned>(h),
-            static_cast<unsigned>(DefaultDepth(dpy_, scr))); // same depth as window
-    }
-
-    ~X11Window() { // destructor – release all X resources
-        if (buf_) XFreePixmap(dpy_, buf_); // free back-buffer
-        if (gc_)  XFreeGC(dpy_, gc_);      // free GC
-        if (win_) XDestroyWindow(dpy_, win_); // destroy window
-        if (dpy_) XCloseDisplay(dpy_);      // close connection
-    }
-
-    void drawText(int x, int y, const std::string& text, Color c) override {
-        setFg(c);                                              // set text color
-        XDrawString(dpy_, buf_, gc_,                          // draw to back buffer
-            x, y + 12,                                        // baseline offset +12px
-            text.c_str(), static_cast<int>(text.size()));     // text data
-    }
-
-    void drawRect(int x, int y, int w, int h, Color c) override {
-        setFg(c); // set outline color
-        XDrawRectangle(dpy_, buf_, gc_,              // draw hollow rectangle
-            x, y,                                    // top-left corner
-            static_cast<unsigned>(w - 1),            // width (exclusive)
-            static_cast<unsigned>(h - 1));            // height (exclusive)
-    }
-
-    void fillRect(int x, int y, int w, int h, Color c) override {
-        setFg(c); // set fill color
-        XFillRectangle(dpy_, buf_, gc_,              // fill solid rectangle
-            x, y,
-            static_cast<unsigned>(w),
-            static_cast<unsigned>(h));
-    }
-
-    void updateDisplay() override {
-        XCopyArea(dpy_, buf_, win_, gc_,             // blit back-buffer to window
-            0, 0, static_cast<unsigned>(width_),
-            static_cast<unsigned>(height_), 0, 0);   // source and dest origins
-        XFlush(dpy_);                                // flush to X server
-    }
-
-    void handleInput(std::function<void(KeyEvent)> cb) override {
-        keyCb_ = std::move(cb); // store key callback
-    }
-
-    // Not part of IWindow; called by main() to register the redraw callback
-    void setRedrawCallback(std::function<void()> cb) {
-        redrawCb_ = std::move(cb); // store redraw callback
-    }
-
-    void run() override { // X11 event loop
-        XEvent ev;              // event storage
-        bool   running = true;  // loop flag
-        while (running) {       // process events until window closes
-            XNextEvent(dpy_, &ev); // block until next event
-            if (ev.type == Expose && ev.xexpose.count == 0) { // final expose
-                if (redrawCb_) redrawCb_(); // re-render on expose
-            } else if (ev.type == KeyPress) {           // keyboard event
-                char   buf[8]  = {};                    // character buffer
-                KeySym sym     = 0;                     // key symbol
-                XLookupString(&ev.xkey, buf, sizeof(buf) - 1, &sym, nullptr); // decode
-
-                KeyEvent ke{};                          // build event
-                ke.ctrl  = (ev.xkey.state & ControlMask) != 0; // ctrl modifier
-                ke.shift = (ev.xkey.state & ShiftMask)  != 0; // shift modifier
-                ke.ch    = buf[0];                      // decoded character
-
-                // Normalise ctrl characters to lowercase letters
-                if (ke.ctrl && ke.ch >= 1 && ke.ch <= 26)
-                    ke.ch = static_cast<char>(ke.ch + 'a' - 1); // e.g. ^S -> 's'
-
-                switch (sym) { // map X11 keysym to IWindow key codes
-                    case XK_Up:        ke.key = KEY_UP;        ke.ch = 0; break;
-                    case XK_Down:      ke.key = KEY_DOWN;      ke.ch = 0; break;
-                    case XK_Left:      ke.key = KEY_LEFT;      ke.ch = 0; break;
-                    case XK_Right:     ke.key = KEY_RIGHT;     ke.ch = 0; break;
-                    case XK_Return:    ke.key = KEY_ENTER;               break;
-                    case XK_Escape:    ke.key = KEY_ESC;                 break;
-                    case XK_BackSpace: ke.key = KEY_BACKSPACE;           break;
-                    default:           ke.key = static_cast<int>(buf[0]); break;
-                }
-                if (keyCb_) keyCb_(ke); // dispatch to application
-            }
-        }
-    }
-};
-
-int main() { // program entry point
-    int w = 40  + Spreadsheet::COLS * 100; // total window width
-    int h = 20  + Spreadsheet::ROWS * 25;  // total window height
-    X11Window win(w, h);                   // create X11 window
-    App       app(win);                    // create application
-    win.setRedrawCallback([&app]() { app.render(); }); // hook render
-    app.render();                          // draw initial frame
-    win.run();                             // start event loop
-    return 0;                              // exit cleanly
-}
+    X11Win(int w,int h):W(w),H(h){ // ctor
+        dpy=XOpenDisplay(nullptr);if(!dpy)throw std::runtime_error("X"); // connect
+        int s=DefaultScreen(dpy); // screen
+        win=XCreateSimpleWindow(dpy,RootWindow(dpy,s),0,0,w,h,1,BlackPixel(dpy,s),WhitePixel(dpy,s)); // window
+        XSelectInput(dpy,win,ExposureMask|KeyPressMask);XStoreName(dpy,win,"Spreadsheet");XMapWindow(dpy,win);XFlush(dpy); // setup
+        gc=XCreateGC(dpy,win,0,nullptr);buf=XCreatePixmap(dpy,win,w,h,DefaultDepth(dpy,s));} // gc, pixmap
+    ~X11Win(){if(buf){XFreePixmap(dpy,buf);}if(gc){XFreeGC(dpy,gc);}if(win){XDestroyWindow(dpy,win);}if(dpy){XCloseDisplay(dpy);}} // dtor
+    void drawText(int x,int y,const std::string&t,Color c)override{fg(c);XDrawString(dpy,buf,gc,x,y+12,t.c_str(),(int)t.size());} // text
+    void drawRect(int x,int y,int w,int h,Color c)override{fg(c);XDrawRectangle(dpy,buf,gc,x,y,(unsigned)(w-1),(unsigned)(h-1));} // outline
+    void fillRect(int x,int y,int w,int h,Color c)override{fg(c);XFillRectangle(dpy,buf,gc,x,y,(unsigned)w,(unsigned)h);} // fill
+    void updateDisplay()override{XCopyArea(dpy,buf,win,gc,0,0,(unsigned)W,(unsigned)H,0,0);XFlush(dpy);} // blit
+    void handleInput(std::function<void(KeyEvent)>f)override{kcb=std::move(f);} // bind
+    void setRedraw(std::function<void()>f){rcb=std::move(f);} // bind
+    void run()override{ // loop
+        XEvent ev; // event
+        for(;;){XNextEvent(dpy,&ev); // next
+            if(ev.type==Expose&&ev.xexpose.count==0&&rcb)rcb(); // expose
+            else if(ev.type==KeyPress){ // key
+                char buf[8]={};KeySym sym=0;XLookupString(&ev.xkey,buf,7,&sym,nullptr); // decode
+                KeyEvent ke{};ke.ctrl=(ev.xkey.state&ControlMask)!=0;ke.shift=(ev.xkey.state&ShiftMask)!=0;ke.ch=buf[0]; // build
+                if(ke.ctrl&&ke.ch>=1&&ke.ch<=26)ke.ch=char(ke.ch+'a'-1); // norm
+                switch(sym){case XK_Up:ke.key=KEY_UP;ke.ch=0;break;case XK_Down:ke.key=KEY_DOWN;ke.ch=0;break;case XK_Left:ke.key=KEY_LEFT;ke.ch=0;break;case XK_Right:ke.key=KEY_RIGHT;ke.ch=0;break;case XK_Return:ke.key=KEY_ENTER;break;case XK_Escape:ke.key=KEY_ESC;break;case XK_BackSpace:ke.key=KEY_BACKSPACE;break;default:ke.key=int(buf[0]);break;} // map
+                if(kcb)kcb(ke);}}}};// dispatch
+int main(){ // entry
+    int w=40+Spreadsheet::COLS*100,h=20+Spreadsheet::ROWS*25; // size
+    X11Win win(w,h);App app(win);win.setRedraw([&]{app.render();});app.render();win.run();return 0;} // run

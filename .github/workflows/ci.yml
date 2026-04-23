@@ -1,31 +1,19 @@
 name: CI
-
-on: [push, pull_request] # trigger on push and PR
-
+on: [push,pull_request] # trigger
 permissions:
-  contents: read # minimal GITHUB_TOKEN permissions
-
+  contents: read # min perms
 jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest] # all three platforms
-    runs-on: ${{ matrix.os }} # run on each platform
-
+        os: [ubuntu-latest,windows-latest,macos-latest] # platforms
+    runs-on: ${{ matrix.os }} # runner
     steps:
-      - uses: actions/checkout@v4 # checkout repository
-
-      - name: Install X11 deps (Linux)
-        if: runner.os == 'Linux' # only on Linux
-        run: sudo apt-get update && sudo apt-get install -y libx11-dev # install X11 headers
-
-      - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release # configure project
-
+      - uses: actions/checkout@v4 # checkout
+      - name: X11 deps
+        if: runner.os == 'Linux' # linux only
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev # install
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release # config
       - name: Build
-        run: cmake --build build --config Release # compile project
-
-      - name: Smoke test (Linux headless)
-        if: runner.os == 'Linux' # only possible headlessly on Linux
-        run: | # run a quick sanity check
-          echo "Build succeeded for ${{ matrix.os }}" # print success message
+        run: cmake --build build --config Release # build
