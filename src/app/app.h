@@ -1,16 +1,48 @@
-#pragma once // guard
-#include "platform.h" // IWindow
-#include "core.h" // Spreadsheet
-class App{ // application
+// =============================================================================
+// app.h  —  Application controller (the "Controller" in MVC)
+//
+// App sits between the platform window (IWindow) and the data model
+// (Spreadsheet).  It:
+//   • owns the Spreadsheet and the selection / editing state
+//   • renders the grid onto the window each frame
+//   • translates keyboard events into model mutations and navigations
+// =============================================================================
+#pragma once
+#include "platform.h"  // IWindow, KeyEvent, Color
+#include "core.h"      // Spreadsheet, Cell
+
+class App {
 public:
-    explicit App(IWindow&w); // ctor
-    void render(); // draw grid
-    void onKey(KeyEvent e); // handle key
+    // Construct the App, binding the window's input callback to onKey().
+    // The window reference is stored non-owning; the window must outlive App.
+    explicit App(IWindow& w);
+
+    // Repaint the entire grid to the window's back-buffer and blit it.
+    // Called after every state change and on initial display.
+    void render();
+
+    // Handle one keyboard event.  Delegates to edit-mode or navigation-mode
+    // logic depending on the current state of `editing_`.
+    void onKey(KeyEvent e);
+
 private:
-    IWindow&win_; // window ref
-    Spreadsheet sheet_; // data model
-    int selRow_=0,selCol_=0; // selection
-    bool editing_=false; // edit mode
-    std::string editBuf_; // edit buffer
-    static constexpr int CW=100,CH=25,HW=40,HH=20; // cell/header dims
+    IWindow&    win_;          // non-owning reference to the platform window
+    Spreadsheet sheet_;        // the data model (cells, formulas, values)
+
+    // Selection: the cell currently highlighted by the cursor.
+    int selRow_ = 0;
+    int selCol_ = 0;
+
+    // Edit mode: when true the user is typing a new value for the selected cell.
+    bool editing_ = false;
+
+    // The characters the user has typed so far during an edit session.
+    // Committed to the sheet on Enter, discarded on Escape.
+    std::string editBuf_;
+
+    // Layout constants (pixels):
+    //   CW, CH — cell width and height
+    //   HW, HH — header column width and header row height
+    static constexpr int CW = 100, CH = 25;   // cell dimensions
+    static constexpr int HW =  40, HH = 20;   // header dimensions
 };
