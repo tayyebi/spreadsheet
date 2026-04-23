@@ -47,16 +47,6 @@ double BinaryOpNode::eval(EvalCtx&ctx){ // binop
     double l=left?left->eval(ctx):0,r=right?right->eval(ctx):0;if(ctx.err)return 0; // ops
     switch(op){case'+':return l+r;case'-':return l-r;case'*':return l*r;
         case'/':if(r==0){ctx.err=true;return 0;}return l/r;default:ctx.err=true;return 0;}} // arith
-double FunctionNode::eval(EvalCtx&ctx){ // func
-    if(name=="SUM"){double t=0; // SUM
-        if(isRange){for(int rr=r1;rr<=r2;++rr)for(int cc=c1;cc<=c2;++cc){ // range
-            auto k=Spreadsheet::key(rr,cc);if(ctx.vis.count(k))continue; // skip
-            ctx.sheet.evalCell(rr,cc,ctx.vis,ctx.done);
-            const Cell*c=ctx.sheet.getCell(rr,cc);
-            if(c&&std::holds_alternative<double>(c->value))t+=std::get<double>(c->value);}} // add
-        else{for(auto&a:args)if(a)t+=a->eval(ctx);} // list
-        return t;} // total
-    ctx.err=true;return 0;} // err
 using N=std::unique_ptr<ASTNode>; // alias
 static N mkBin(char o,N l,N r){auto b=std::make_unique<BinaryOpNode>();b->op=o;b->left=std::move(l);b->right=std::move(r);return b;} // build
 struct Par{ // parser
