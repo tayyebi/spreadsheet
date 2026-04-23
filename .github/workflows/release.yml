@@ -1,0 +1,52 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*' # trigger on version tags, e.g. v1.0.0
+permissions:
+  contents: write # needed to create releases and upload assets
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: spreadsheet-linux
+            binary: build/spreadsheet
+          - os: windows-latest
+            artifact: spreadsheet-windows
+            binary: build/Release/spreadsheet.exe
+          - os: macos-latest
+            artifact: spreadsheet-macos
+            binary: build/spreadsheet
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: X11 deps
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --config Release
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.binary }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true # flatten into dist/
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true # auto-generate changelog from commits

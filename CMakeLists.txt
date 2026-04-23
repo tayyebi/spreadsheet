@@ -68,6 +68,13 @@ endif()
 # ------------------------------------------------------------------------------
 add_executable(spreadsheet ${SOURCES})
 
+# On Windows the entry point is WinMain (a GUI subsystem executable), not main.
+# Without WIN32_EXECUTABLE the linker generates a console application and looks
+# for main(), causing LNK2019 "unresolved external symbol main".
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set_target_properties(spreadsheet PROPERTIES WIN32_EXECUTABLE TRUE)
+endif()
+
 # Each sub-directory is added as a separate include path so that files within
 # a layer can include their own headers without path prefixes, e.g.:
 #   #include "core.h"     (from any file in src/core/)
