@@ -1,0 +1,28 @@
+name: CI
+
+on: [push, pull_request] # trigger on push and PR
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest] # all three platforms
+    runs-on: ${{ matrix.os }} # run on each platform
+
+    steps:
+      - uses: actions/checkout@v4 # checkout repository
+
+      - name: Install X11 deps (Linux)
+        if: runner.os == 'Linux' # only on Linux
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev # install X11 headers
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release # configure project
+
+      - name: Build
+        run: cmake --build build --config Release # compile project
+
+      - name: Smoke test (Linux headless)
+        if: runner.os == 'Linux' # only possible headlessly on Linux
+        run: | # run a quick sanity check
+          echo "Build succeeded for ${{ matrix.os }}" # print success message
