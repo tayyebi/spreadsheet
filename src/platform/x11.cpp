@@ -33,8 +33,9 @@ class X11Win : public IWindow {
     int      W, H;            // window dimensions in pixels
 
     // Callbacks registered by the App layer.
-    std::function<void(KeyEvent)> kcb;  // keyboard event callback
-    std::function<void()>         rcb;  // redraw/expose callback
+    std::function<void(KeyEvent)>   kcb;  // keyboard event callback
+    std::function<void(MouseEvent)> mcb;  // mouse event callback
+    std::function<void()>           rcb;  // redraw/expose callback
 
     // -----------------------------------------------------------------------
     // fg()  —  set the X foreground (drawing) colour
@@ -70,8 +71,8 @@ public:
                                   0, 0, w, h, 1,
                                   BlackPixel(dpy, s), WhitePixel(dpy, s));
 
-        // Subscribe to Expose (repaint) and KeyPress events.
-        XSelectInput(dpy, win, ExposureMask | KeyPressMask);
+        // Subscribe to Expose (repaint), KeyPress, and mouse button events.
+        XSelectInput(dpy, win, ExposureMask | KeyPressMask | ButtonPressMask);
         XStoreName(dpy, win, "Spreadsheet");   // title bar text
         XMapWindow(dpy, win);                  // make the window visible
         XFlush(dpy);                           // send all pending X commands
@@ -125,15 +126,21 @@ public:
         kcb = std::move(f);
     }
 
+    // Register the mouse button callback.
+    void handleMouse(std::function<void(MouseEvent)> f) override {
+        mcb = std::move(f);
+    }
+
     // Register the redraw callback (called on Expose events).
     void setRedraw(std::function<void()> f) { rcb = std::move(f); }
 
     // -----------------------------------------------------------------------
     // run()  —  the X11 event loop
     //
-    // Blocks forever, dispatching two event types:
-    //   Expose    — the window was uncovered and needs repainting
-    //   KeyPress  — the user pressed a key
+    // Blocks forever, dispatching event types:
+    //   Expose      — the window was uncovered and needs repainting
+    //   KeyPress    — the user pressed a key
+    //   ButtonPress — the user clicked a mouse button
     // -----------------------------------------------------------------------
     void run() override {
         XEvent ev;
@@ -144,6 +151,16 @@ public:
                 // count == 0 means this is the last pending Expose event;
                 // we only repaint on the last one to avoid redundant redraws.
                 rcb();
+            } else if (ev.type == ButtonPress) {
+                // Forward mouse button press to the App layer.
+                if (mcb) {
+                    MouseEvent me{};
+                    me.x       = ev.xbutton.x;
+                    me.y       = ev.xbutton.y;
+                    me.button  = (int)ev.xbutton.button;  // 1=left,2=mid,3=right
+                    me.pressed = true;
+                    mcb(me);
+                }
             } else if (ev.type == KeyPress) {
                 char    buf8[8] = {};
                 KeySym  sym     = 0;
@@ -154,6 +171,7 @@ public:
                 KeyEvent ke{};
                 ke.ctrl  = (ev.xkey.state & ControlMask) != 0;
                 ke.shift = (ev.xkey.state & ShiftMask)   != 0;
+                ke.alt   = (ev.xkey.state & Mod1Mask)    != 0;
                 ke.ch    = buf8[0];
 
                 // When Ctrl is held, XLookupString returns control codes 1–26
@@ -171,6 +189,14 @@ public:
                     case XK_Return:    ke.key = KEY_ENTER;                break;
                     case XK_Escape:    ke.key = KEY_ESC;                  break;
                     case XK_BackSpace: ke.key = KEY_BACKSPACE;            break;
+                    case XK_Tab:       ke.key = KEY_TAB;       ke.ch = '\t'; break;
+                    case XK_Delete:    ke.key = KEY_DELETE;    ke.ch = 0; break;
+                    case XK_F2:        ke.key = KEY_F2;        ke.ch = 0; break;
+                    case XK_F5:        ke.key = KEY_F5;        ke.ch = 0; break;
+                    case XK_Home:      ke.key = KEY_HOME;      ke.ch = 0; break;
+                    case XK_End:       ke.key = KEY_END;       ke.ch = 0; break;
+                    case XK_Page_Up:   ke.key = KEY_PGUP;      ke.ch = 0; break;
+                    case XK_Page_Down: ke.key = KEY_PGDN;      ke.ch = 0; break;
                     default:           ke.key = int(buf8[0]);             break;
                 }
 
@@ -184,15 +210,16 @@ public:
 // main()  —  application entry point for Linux/X11
 // ---------------------------------------------------------------------------
 int main() {
-    // Compute window size: header area + grid area.
-    int w = 40 + Spreadsheet::COLS * 100;
-    int h = 20 + Spreadsheet::ROWS * 25;
+    // Compute window size from App layout constants so it stays in sync.
+    int w = App::HW + Spreadsheet::COLS * App::CW;
+    int h = App::TB + App::FB + App::HH + Spreadsheet::ROWS * App::CH;
 
     X11Win win(w, h);
     App    app(win);
 
-    // Wire the redraw callback so that Expose events trigger a full repaint.
+    // Wire callbacks so X events reach the App layer.
     win.setRedraw([&] { app.render(); });
+    win.handleMouse([&](MouseEvent e) { app.onMouse(e); });
 
     app.render();  // draw the initial (empty) grid before entering the loop
     win.run();     // blocks until the window is closed
