@@ -41,8 +41,9 @@ class W32Win : public IWindow {
     int W, H;                 // window client area dimensions in pixels
 
     // Callbacks registered by the App layer.
-    std::function<void(KeyEvent)> kcb;  // keyboard event callback
-    std::function<void()>         rcb;  // WM_PAINT / redraw callback
+    std::function<void(KeyEvent)>   kcb;  // keyboard event callback
+    std::function<void(MouseEvent)> mcb;  // mouse event callback
+    std::function<void()>           rcb;  // WM_PAINT / redraw callback
 
     // Singleton pointer: Win32 window procedures (WP) are global C callbacks
     // with no user-data pointer, so we keep one static instance pointer so
@@ -146,7 +147,8 @@ public:
     }
 
     void handleInput(std::function<void(KeyEvent)> f) override { kcb = std::move(f); }
-    void setRCB(std::function<void()> f)                       { rcb = std::move(f); }
+    void handleMouse(std::function<void(MouseEvent)> f) override { mcb = std::move(f); }
+    void setRCB(std::function<void()> f)                        { rcb = std::move(f); }
 
     // Standard Win32 message loop: GetMessageW blocks until a message arrives,
     // TranslateMessage generates WM_CHAR from WM_KEYDOWN for printable keys,
@@ -194,10 +196,26 @@ public:
                 case VK_RETURN: ke.key = KEY_ENTER;     break;
                 case VK_ESCAPE: ke.key = KEY_ESC;       break;
                 case VK_BACK:   ke.key = KEY_BACKSPACE; break;
+                case VK_DELETE: ke.key = KEY_DELETE;    break;
+                case VK_TAB:    ke.key = KEY_TAB;       break;
+                case VK_HOME:   ke.key = KEY_HOME;      break;
+                case VK_END:    ke.key = KEY_END;       break;
+                case VK_F2:     ke.key = KEY_F2;        break;
                 // All other keys are handled by WM_CHAR instead.
                 default: return DefWindowProcW(hw, msg, wp, lp);
             }
             inst->kcb(ke);
+            return 0;
+        }
+        case WM_LBUTTONDOWN: {
+            // Left mouse button pressed: translate to a MouseEvent.
+            if (inst->mcb) {
+                MouseEvent me{};
+                me.x      = (int)(short)LOWORD(lp);  // cursor x in client coords
+                me.y      = (int)(short)HIWORD(lp);  // cursor y in client coords
+                me.button = 1;
+                inst->mcb(me);
+            }
             return 0;
         }
         case WM_CHAR: {
@@ -229,8 +247,8 @@ W32Win* W32Win::inst = nullptr;
 // WinMain()  —  application entry point for Windows
 // ---------------------------------------------------------------------------
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
-    int w = 40 + Spreadsheet::COLS * 100;
-    int h = 20 + Spreadsheet::ROWS * 25;
+    int w = App::HW + Spreadsheet::COLS * App::CW;
+    int h = App::TB + App::FB + App::HH + Spreadsheet::ROWS * App::CH;
 
     W32Win win(w, h);
     App    app(win);

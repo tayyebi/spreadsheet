@@ -43,6 +43,7 @@ class MacWin;  // forward declaration so SpV (an Obj-C class) can reference it
     MacWin* mw_;  // pointer to the owning MacWin (not reference-counted)
 }
 - (instancetype)initWithFrame:(NSRect)f mw:(MacWin*)m;  // designated initialiser
+- (void)mouseDown:(NSEvent*)ev;
 @end
 
 // ---------------------------------------------------------------------------
@@ -55,8 +56,9 @@ class MacWin : public IWindow {
     int W, H;                     // window dimensions in pixels
 
     // Callbacks registered by the App layer.
-    std::function<void(KeyEvent)> kcb;  // keyboard event callback
-    std::function<void()>         rcb;  // redraw callback
+    std::function<void(KeyEvent)>   kcb;  // keyboard event callback
+    std::function<void(MouseEvent)> mcb;  // mouse event callback
+    std::function<void()>           rcb;  // redraw callback
 
 public:
     // -----------------------------------------------------------------------
@@ -147,7 +149,8 @@ public:
     void updateDisplay() override { [v setNeedsDisplay:YES]; }
 
     void handleInput(std::function<void(KeyEvent)> f) override { kcb = std::move(f); }
-    void setRCB(std::function<void()> f)                       { rcb = std::move(f); }
+    void handleMouse(std::function<void(MouseEvent)> f) override { mcb = std::move(f); }
+    void setRCB(std::function<void()> f)                        { rcb = std::move(f); }
 
     // Start the Cocoa run loop.  Blocks until the application quits.
     void run() override { [NSApp run]; }
@@ -187,6 +190,11 @@ public:
             case NSDownArrowFunctionKey:  ke.key = KEY_DOWN;      ke.ch = 0; break;
             case NSLeftArrowFunctionKey:  ke.key = KEY_LEFT;      ke.ch = 0; break;
             case NSRightArrowFunctionKey: ke.key = KEY_RIGHT;     ke.ch = 0; break;
+            case NSDeleteFunctionKey:     ke.key = KEY_DELETE;    ke.ch = 0; break;
+            case '\t':                    ke.key = KEY_TAB;       ke.ch = 0; break;
+            case NSHomeFunctionKey:       ke.key = KEY_HOME;      ke.ch = 0; break;
+            case NSEndFunctionKey:        ke.key = KEY_END;       ke.ch = 0; break;
+            case NSF2FunctionKey:         ke.key = KEY_F2;        ke.ch = 0; break;
             case '\r': case '\n':         ke.key = KEY_ENTER;                break;
             case 0x1B:                    ke.key = KEY_ESC;                  break;
             case NSDeleteCharacter:
@@ -195,6 +203,21 @@ public:
         }
 
         kcb(ke);
+    }
+
+    // -----------------------------------------------------------------------
+    // onMouseDown()  —  translate an NSEvent mouse click to a MouseEvent
+    // -----------------------------------------------------------------------
+    void onMouseDown(NSEvent* ev) {
+        if (!mcb) return;
+        // Convert from window coordinates (Cocoa: origin bottom-left) to our
+        // top-left coordinate system by flipping the y axis.
+        NSPoint p = [v convertPoint:[ev locationInWindow] fromView:nil];
+        MouseEvent me{};
+        me.x      = (int)p.x;
+        me.y      = H - (int)p.y;  // flip: CG y is from bottom, our API is from top
+        me.button = 1;              // mouseDown: is always left button
+        mcb(me);
     }
 };
 
@@ -220,6 +243,11 @@ public:
     if (mw_) mw_->onKey(ev);
 }
 
+// Forward left-button mouse clicks to MacWin::onMouseDown().
+- (void)mouseDown:(NSEvent*)ev {
+    if (mw_) mw_->onMouseDown(ev);
+}
+
 // Must return YES so that the view can become the first responder
 // (required to receive keyboard events).
 - (BOOL)acceptsFirstResponder { return YES; }
@@ -231,8 +259,8 @@ public:
 // ---------------------------------------------------------------------------
 int main() {
     @autoreleasepool {  // ARC autorelease pool: frees Obj-C temporaries on scope exit
-        int w = 40 + Spreadsheet::COLS * 100;
-        int h = 20 + Spreadsheet::ROWS * 25;
+        int w = App::HW + Spreadsheet::COLS * App::CW;
+        int h = App::TB + App::FB + App::HH + Spreadsheet::ROWS * App::CH;
 
         MacWin win(w, h);
         App    app(win);

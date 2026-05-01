@@ -33,8 +33,9 @@ class X11Win : public IWindow {
     int      W, H;            // window dimensions in pixels
 
     // Callbacks registered by the App layer.
-    std::function<void(KeyEvent)> kcb;  // keyboard event callback
-    std::function<void()>         rcb;  // redraw/expose callback
+    std::function<void(KeyEvent)>   kcb;  // keyboard event callback
+    std::function<void(MouseEvent)> mcb;  // mouse event callback
+    std::function<void()>           rcb;  // redraw/expose callback
 
     // -----------------------------------------------------------------------
     // fg()  —  set the X foreground (drawing) colour
@@ -70,8 +71,8 @@ public:
                                   0, 0, w, h, 1,
                                   BlackPixel(dpy, s), WhitePixel(dpy, s));
 
-        // Subscribe to Expose (repaint) and KeyPress events.
-        XSelectInput(dpy, win, ExposureMask | KeyPressMask);
+        // Subscribe to Expose (repaint), KeyPress, and ButtonPress events.
+        XSelectInput(dpy, win, ExposureMask | KeyPressMask | ButtonPressMask);
         XStoreName(dpy, win, "Spreadsheet");   // title bar text
         XMapWindow(dpy, win);                  // make the window visible
         XFlush(dpy);                           // send all pending X commands
@@ -125,6 +126,11 @@ public:
         kcb = std::move(f);
     }
 
+    // Register the mouse callback (replaces any previous registration).
+    void handleMouse(std::function<void(MouseEvent)> f) override {
+        mcb = std::move(f);
+    }
+
     // Register the redraw callback (called on Expose events).
     void setRedraw(std::function<void()> f) { rcb = std::move(f); }
 
@@ -168,6 +174,11 @@ public:
                     case XK_Down:      ke.key = KEY_DOWN;      ke.ch = 0; break;
                     case XK_Left:      ke.key = KEY_LEFT;      ke.ch = 0; break;
                     case XK_Right:     ke.key = KEY_RIGHT;     ke.ch = 0; break;
+                    case XK_Delete:    ke.key = KEY_DELETE;    ke.ch = 0; break;
+                    case XK_Tab:       ke.key = KEY_TAB;       ke.ch = 0; break;
+                    case XK_Home:      ke.key = KEY_HOME;      ke.ch = 0; break;
+                    case XK_End:       ke.key = KEY_END;       ke.ch = 0; break;
+                    case XK_F2:        ke.key = KEY_F2;        ke.ch = 0; break;
                     case XK_Return:    ke.key = KEY_ENTER;                break;
                     case XK_Escape:    ke.key = KEY_ESC;                  break;
                     case XK_BackSpace: ke.key = KEY_BACKSPACE;            break;
@@ -175,6 +186,14 @@ public:
                 }
 
                 if (kcb) kcb(ke);
+            } else if (ev.type == ButtonPress) {
+                // Translate X11 button event to a platform-independent MouseEvent.
+                // X button numbers: 1=left, 2=middle, 3=right.
+                MouseEvent me{};
+                me.x      = ev.xbutton.x;
+                me.y      = ev.xbutton.y;
+                me.button = (int)ev.xbutton.button;
+                if (mcb) mcb(me);
             }
         }
     }
@@ -184,9 +203,9 @@ public:
 // main()  —  application entry point for Linux/X11
 // ---------------------------------------------------------------------------
 int main() {
-    // Compute window size: header area + grid area.
-    int w = 40 + Spreadsheet::COLS * 100;
-    int h = 20 + Spreadsheet::ROWS * 25;
+    // Compute window size from the App layout constants and grid dimensions.
+    int w = App::HW + Spreadsheet::COLS * App::CW;
+    int h = App::TB + App::FB + App::HH + Spreadsheet::ROWS * App::CH;
 
     X11Win win(w, h);
     App    app(win);

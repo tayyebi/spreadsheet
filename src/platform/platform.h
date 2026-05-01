@@ -23,6 +23,18 @@
 struct Color { uint8_t r, g, b; };
 
 // ---------------------------------------------------------------------------
+// MouseEvent  —  a normalised mouse button event
+//
+//   x, y    – cursor position in window coordinates (origin top-left, y down)
+//   button  – which button was pressed: 1 = left, 2 = middle, 3 = right
+// ---------------------------------------------------------------------------
+struct MouseEvent {
+    int x      = 0;
+    int y      = 0;
+    int button = 0;
+};
+
+// ---------------------------------------------------------------------------
 // KeyEvent  —  a normalised keyboard event
 //
 // The platform translates its native key representation into this struct
@@ -76,6 +88,10 @@ public:
     // Only one callback is active at a time (the last one registered wins).
     virtual void handleInput(std::function<void(KeyEvent)> cb) = 0;
 
+    // Register the callback that will be called for every mouse button event.
+    // Only one callback is active at a time (the last one registered wins).
+    virtual void handleMouse(std::function<void(MouseEvent)> cb) = 0;
+
     // Start the platform event loop.  Blocks until the window is closed.
     virtual void run() = 0;
 
@@ -90,7 +106,12 @@ public:
     static constexpr int KEY_DOWN      = 0x101;   // ↓ arrow
     static constexpr int KEY_LEFT      = 0x102;   // ← arrow
     static constexpr int KEY_RIGHT     = 0x103;   // → arrow
+    static constexpr int KEY_DELETE    = 0x104;   // Delete (forward delete)
+    static constexpr int KEY_HOME      = 0x105;   // Home
+    static constexpr int KEY_END       = 0x106;   // End
+    static constexpr int KEY_F2        = 0x107;   // F2 (enter edit mode)
     static constexpr int KEY_ENTER     = '\r';    // Carriage Return (13)
     static constexpr int KEY_ESC       = 0x1B;    // Escape (27)
     static constexpr int KEY_BACKSPACE = 0x08;    // Backspace (8)
+    static constexpr int KEY_TAB       = '\t';    // Tab (9)
 };

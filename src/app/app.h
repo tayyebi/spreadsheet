@@ -8,8 +8,10 @@
 //   • translates keyboard events into model mutations and navigations
 // =============================================================================
 #pragma once
-#include "platform.h"  // IWindow, KeyEvent, Color
+#include "platform.h"  // IWindow, KeyEvent, MouseEvent, Color
 #include "core.h"      // Spreadsheet, Cell
+#include <string>
+#include <vector>
 
 class App {
 public:
@@ -24,6 +26,23 @@ public:
     // Handle one keyboard event.  Delegates to edit-mode or navigation-mode
     // logic depending on the current state of `editing_`.
     void onKey(KeyEvent e);
+
+    // Handle one mouse button press event.  Used for toolbar button clicks
+    // and grid cell selection.
+    void onMouse(MouseEvent e);
+
+    // -----------------------------------------------------------------------
+    // Layout constants (pixels) — public so platform main() can compute the
+    // window size without hard-coding the values.
+    //
+    //   TB, FB — toolbar and formula-bar heights (above the column headers)
+    //   CW, CH — cell width and height
+    //   HW, HH — header column width and header row height
+    // -----------------------------------------------------------------------
+    static constexpr int TB = 32;            // toolbar height
+    static constexpr int FB = 25;            // formula bar height
+    static constexpr int CW = 100, CH = 25;  // cell dimensions
+    static constexpr int HW =  40, HH = 20;  // header dimensions
 
 private:
     IWindow&    win_;          // non-owning reference to the platform window
@@ -40,9 +59,12 @@ private:
     // Committed to the sheet on Enter, discarded on Escape.
     std::string editBuf_;
 
-    // Layout constants (pixels):
-    //   CW, CH — cell width and height
-    //   HW, HH — header column width and header row height
-    static constexpr int CW = 100, CH = 25;   // cell dimensions
-    static constexpr int HW =  40, HH = 20;   // header dimensions
+    // -----------------------------------------------------------------------
+    // Toolbar button descriptor
+    //
+    // Each entry names a rectangular click target and the action it triggers.
+    // Positions are in window pixels (origin top-left, before any grid offset).
+    // -----------------------------------------------------------------------
+    struct ToolButton { int x, y, w, h; std::string label; };
+    std::vector<ToolButton> buttons_;
 };
