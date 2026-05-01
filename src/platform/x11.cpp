@@ -137,9 +137,10 @@ public:
     // -----------------------------------------------------------------------
     // run()  —  the X11 event loop
     //
-    // Blocks forever, dispatching two event types:
-    //   Expose    — the window was uncovered and needs repainting
-    //   KeyPress  — the user pressed a key
+    // Blocks forever, dispatching three event types:
+    //   Expose      — the window was uncovered and needs repainting
+    //   KeyPress    — the user pressed a key
+    //   ButtonPress — the user clicked a mouse button
     // -----------------------------------------------------------------------
     void run() override {
         XEvent ev;

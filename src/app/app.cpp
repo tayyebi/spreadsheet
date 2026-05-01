@@ -207,6 +207,7 @@ void App::onKey(KeyEvent e) {
             sheet_.setCell(selRow_, selCol_, editBuf_);
             sheet_.evaluateAll();
             editing_ = false;
+            editBuf_.clear();
         } else if (e.key == IWindow::KEY_TAB) {
             // Commit and move one column right.
             sheet_.setCell(selRow_, selCol_, editBuf_);
