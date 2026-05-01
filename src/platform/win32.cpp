@@ -41,8 +41,9 @@ class W32Win : public IWindow {
     int W, H;                 // window client area dimensions in pixels
 
     // Callbacks registered by the App layer.
-    std::function<void(KeyEvent)> kcb;  // keyboard event callback
-    std::function<void()>         rcb;  // WM_PAINT / redraw callback
+    std::function<void(KeyEvent)>   kcb;  // keyboard event callback
+    std::function<void(MouseEvent)> mcb;  // mouse event callback
+    std::function<void()>           rcb;  // WM_PAINT / redraw callback
 
     // Singleton pointer: Win32 window procedures (WP) are global C callbacks
     // with no user-data pointer, so we keep one static instance pointer so
@@ -146,6 +147,7 @@ public:
     }
 
     void handleInput(std::function<void(KeyEvent)> f) override { kcb = std::move(f); }
+    void handleMouse(std::function<void(MouseEvent)> f) override { mcb = std::move(f); }
     void setRCB(std::function<void()> f)                       { rcb = std::move(f); }
 
     // Standard Win32 message loop: GetMessageW blocks until a message arrives,
@@ -186,6 +188,7 @@ public:
             KeyEvent ke{};
             ke.ctrl  = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
             ke.shift = (GetKeyState(VK_SHIFT)   & 0x8000) != 0;
+            ke.alt   = (GetKeyState(VK_MENU)    & 0x8000) != 0;
             switch (wp) {
                 case VK_UP:     ke.key = KEY_UP;        break;
                 case VK_DOWN:   ke.key = KEY_DOWN;      break;
@@ -194,6 +197,14 @@ public:
                 case VK_RETURN: ke.key = KEY_ENTER;     break;
                 case VK_ESCAPE: ke.key = KEY_ESC;       break;
                 case VK_BACK:   ke.key = KEY_BACKSPACE; break;
+                case VK_TAB:    ke.key = KEY_TAB;  ke.ch = '\t'; break;
+                case VK_DELETE: ke.key = KEY_DELETE;    break;
+                case VK_F2:     ke.key = KEY_F2;        break;
+                case VK_F5:     ke.key = KEY_F5;        break;
+                case VK_HOME:   ke.key = KEY_HOME;      break;
+                case VK_END:    ke.key = KEY_END;       break;
+                case VK_PRIOR:  ke.key = KEY_PGUP;      break;
+                case VK_NEXT:   ke.key = KEY_PGDN;      break;
                 // All other keys are handled by WM_CHAR instead.
                 default: return DefWindowProcW(hw, msg, wp, lp);
             }
@@ -206,11 +217,24 @@ public:
             KeyEvent ke{};
             ke.key  = int(wp);
             ke.ctrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+            ke.alt  = (GetKeyState(VK_MENU)    & 0x8000) != 0;
             ke.ch   = char(wp);
             // Normalise Ctrl codes 1–26 back to lowercase letters (Ctrl+S = 19 → 's').
             if (ke.ctrl && ke.ch >= 1 && ke.ch <= 26)
                 ke.ch = char(ke.ch + 'a' - 1);
             inst->kcb(ke);
+            return 0;
+        }
+        case WM_LBUTTONDOWN: {
+            // Left mouse button clicked: forward position to the App layer.
+            if (inst->mcb) {
+                MouseEvent me{};
+                me.x      = (int)(short)LOWORD(lp);
+                me.y      = (int)(short)HIWORD(lp);
+                me.button = 1;
+                me.pressed = true;
+                inst->mcb(me);
+            }
             return 0;
         }
         case WM_DESTROY:
@@ -229,14 +253,15 @@ W32Win* W32Win::inst = nullptr;
 // WinMain()  —  application entry point for Windows
 // ---------------------------------------------------------------------------
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
-    int w = 40 + Spreadsheet::COLS * 100;
-    int h = 20 + Spreadsheet::ROWS * 25;
+    int w = App::HW + Spreadsheet::COLS * App::CW;
+    int h = App::TB + App::FB + App::HH + Spreadsheet::ROWS * App::CH;
 
     W32Win win(w, h);
     App    app(win);
 
-    win.setRCB([&] { app.render(); });  // connect WM_PAINT → App::render()
-    app.render();                        // draw the initial grid
-    win.run();                           // enter the message loop
+    win.setRCB([&] { app.render(); });               // connect WM_PAINT → App::render()
+    win.handleMouse([&](MouseEvent e) { app.onMouse(e); });
+    app.render();                                     // draw the initial grid
+    win.run();                                        // enter the message loop
     return 0;
 }
