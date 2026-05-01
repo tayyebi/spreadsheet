@@ -8,8 +8,8 @@
 //   • translates keyboard events into model mutations and navigations
 // =============================================================================
 #pragma once
-#include "platform.h"  // IWindow, KeyEvent, MouseEvent, Color
-#include "core.h"      // Spreadsheet, Cell
+#include "platform.h"   // IWindow, KeyEvent, MouseEvent, Color
+#include "spreadsheet.h" // Spreadsheet, Cell
 #include <string>
 #include <vector>
 

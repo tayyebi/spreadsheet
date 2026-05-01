@@ -26,7 +26,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 #   platform/    — OS-specific window implementation (selected below)
 # ------------------------------------------------------------------------------
 set(SOURCES
-    src/core/core.cpp
+    # Core data model — one source file per responsibility:
+    src/core/spreadsheet.cpp   # grid storage and formula evaluation
+    src/core/csv.cpp           # CSV (RFC-4180) persistence
+    src/core/ods.cpp           # OpenDocument Spreadsheet (.ods) persistence
     src/formula/formula.cpp
     # Shared helpers used by every formula function:
     src/formula/functions/function_base.cpp
@@ -43,7 +46,12 @@ set(SOURCES
     src/formula/functions/power.cpp
     # Dispatcher: implements FunctionNode::eval() via an unordered_map lookup:
     src/formula/functions/dispatch.cpp
-    src/app/app.cpp)
+    # App layer — one source file per responsibility:
+    src/app/app.cpp            # constructor and toolbar layout
+    src/app/renderer.cpp       # App::render()
+    src/app/keyboard.cpp       # App::onKey()
+    src/app/mouse.cpp          # App::onMouse()
+)
 
 # ------------------------------------------------------------------------------
 # Platform selection
