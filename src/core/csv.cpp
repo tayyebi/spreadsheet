@@ -1,13 +1,13 @@
 // =============================================================================
-// csv.cpp  —  CSV (RFC-4180) persistence for Spreadsheet
+// csv.cpp  —  CSV (RFC-4180) persistence: saveCSV() and loadCSV()
 //
-// Implements: saveCSV() and loadCSV().
 // Writes and reads the raw cell strings so that formulas (e.g. "=SUM(A1:A3)")
-// are preserved verbatim and re-evaluated on load.
+// are preserved verbatim and re-evaluated on load.  The grid is accessed
+// entirely through the public Spreadsheet API (getCell / setCell / clear).
 // =============================================================================
 
-#include "spreadsheet.h"  // Spreadsheet, Cell
-#include <fstream>        // std::ifstream, std::ofstream
+#include "csv.h"   // saveCSV, loadCSV declarations
+#include <fstream> // std::ifstream, std::ofstream
 
 // ---------------------------------------------------------------------------
 // E()  —  CSV field escaper (RFC-4180)
@@ -34,16 +34,15 @@ static std::string E(const std::string& s) {
 // Writes ROWS lines, each containing COLS comma-separated fields holding
 // the raw cell strings.  Empty cells produce an empty field.
 // ---------------------------------------------------------------------------
-bool Spreadsheet::saveCSV(const std::string& path) const {
+bool saveCSV(const Spreadsheet& sheet, const std::string& path) {
     std::ofstream f(path);
     if (!f) return false;
 
-    for (int r = 0; r < ROWS; ++r) {
-        for (int c = 0; c < COLS; ++c) {
+    for (int r = 0; r < Spreadsheet::ROWS; ++r) {
+        for (int c = 0; c < Spreadsheet::COLS; ++c) {
             if (c > 0) f << ',';
-            auto it = cells_.find(key(r, c));
-            if (it != cells_.end())
-                f << E(it->second.raw);
+            const Cell* cell = sheet.getCell(r, c);
+            if (cell) f << E(cell->raw);
         }
         f << '\n';
     }
@@ -56,19 +55,19 @@ bool Spreadsheet::saveCSV(const std::string& path) const {
 // Parses RFC-4180 format: quoted fields (with "" for embedded quotes) and
 // plain (unquoted) fields.  Only non-empty cells are stored.
 // ---------------------------------------------------------------------------
-bool Spreadsheet::loadCSV(const std::string& path) {
+bool loadCSV(Spreadsheet& sheet, const std::string& path) {
     std::ifstream f(path);
     if (!f) return false;
 
-    cells_.clear();
+    sheet.clear();
 
     std::string line;
     int r = 0;
-    while (std::getline(f, line) && r < ROWS) {
+    while (std::getline(f, line) && r < Spreadsheet::ROWS) {
         int    c = 0;
         size_t i = 0;
 
-        while (i <= line.size() && c < COLS) {
+        while (i <= line.size() && c < Spreadsheet::COLS) {
             std::string fld;
 
             if (i < line.size() && line[i] == '"') {
@@ -94,10 +93,11 @@ bool Spreadsheet::loadCSV(const std::string& path) {
                 i   = e + 1;
             }
 
-            if (!fld.empty()) setCell(r, c, fld);
+            if (!fld.empty()) sheet.setCell(r, c, fld);
             ++c;
         }
         ++r;
     }
     return true;
 }
+

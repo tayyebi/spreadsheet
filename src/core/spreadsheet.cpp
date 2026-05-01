@@ -40,6 +40,16 @@ const Cell* Spreadsheet::getCell(int r, int c) const {
 }
 
 // ---------------------------------------------------------------------------
+// clear()  —  remove all cell data
+//
+// Called by persistence loaders (loadCSV, loadODS) before populating the
+// grid from a file, so that stale cells from a previous session are removed.
+// ---------------------------------------------------------------------------
+void Spreadsheet::clear() {
+    cells_.clear();
+}
+
+// ---------------------------------------------------------------------------
 // evalCell()  —  evaluate one cell using depth-first search
 //
 // Algorithm overview:

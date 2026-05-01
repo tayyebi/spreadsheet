@@ -2,8 +2,8 @@
 // renderer.cpp  —  App::render(): paint the toolbar, formula bar, and grid
 // =============================================================================
 
-#include "app.h"    // App declaration
-#include <string>   // std::string, std::to_string
+#include "renderer.h"  // paired header (includes app.h)
+#include <string>      // std::string, std::to_string
 
 // ---------------------------------------------------------------------------
 // colLabel()  —  convert a zero-based column index to an Excel-style label

@@ -17,10 +17,10 @@
 // Use saveODS() / loadODS() as a self-contained round-trip format.
 // =============================================================================
 
-#include "spreadsheet.h"  // Spreadsheet, Cell
-#include <fstream>        // std::ifstream, std::ofstream
-#include <vector>         // std::vector<uint8_t>  — ZIP byte buffer
-#include <array>          // std::array<uint32_t,256> — CRC-32 lookup table
+#include "ods.h"    // saveODS, loadODS declarations
+#include <fstream>  // std::ifstream, std::ofstream
+#include <vector>   // std::vector<uint8_t>  — ZIP byte buffer
+#include <array>    // std::array<uint32_t,256> — CRC-32 lookup table
 
 // ---------------------------------------------------------------------------
 // crc32zip()  —  CRC-32 checksum (IEEE 802.3 polynomial, as used by ZIP)
@@ -400,9 +400,9 @@ static bool parseODSContent(const std::string& xml, Spreadsheet& sheet) {
 }
 
 // ---------------------------------------------------------------------------
-// Spreadsheet::saveODS()  —  write the grid to an ODS file
+// saveODS()  —  write the grid to an ODS file
 // ---------------------------------------------------------------------------
-bool Spreadsheet::saveODS(const std::string& path) const {
+bool saveODS(const Spreadsheet& sheet, const std::string& path) {
     static const std::string kMime =
         "application/vnd.oasis.opendocument.spreadsheet";
 
@@ -420,7 +420,7 @@ bool Spreadsheet::saveODS(const std::string& path) const {
         "  manifest:media-type=\"text/xml\"/>\n"
         "</manifest:manifest>\n";
 
-    std::string content = makeContentXML(*this);
+    std::string content = makeContentXML(sheet);
 
     auto toBytes = [](const std::string& s) {
         return std::vector<uint8_t>(s.begin(), s.end());
@@ -442,9 +442,9 @@ bool Spreadsheet::saveODS(const std::string& path) const {
 }
 
 // ---------------------------------------------------------------------------
-// Spreadsheet::loadODS()  —  read the grid from an ODS file
+// loadODS()  —  read the grid from an ODS file
 // ---------------------------------------------------------------------------
-bool Spreadsheet::loadODS(const std::string& path) {
+bool loadODS(Spreadsheet& sheet, const std::string& path) {
     std::ifstream f(path, std::ios::binary);
     if (!f) return false;
     std::vector<uint8_t> data(
@@ -455,6 +455,6 @@ bool Spreadsheet::loadODS(const std::string& path) {
     std::string content = extractZipEntry(data, "content.xml");
     if (content.empty()) return false;
 
-    cells_.clear();
-    return parseODSContent(content, *this);
+    sheet.clear();
+    return parseODSContent(content, sheet);
 }

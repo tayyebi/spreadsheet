@@ -21,8 +21,10 @@
 //     Escape          → cancel: discard editBuf_, return to navigation
 // =============================================================================
 
-#include "app.h"   // App declaration
-#include <cctype>  // std::isprint
+#include "keyboard.h"  // paired header (includes app.h)
+#include "csv.h"       // saveCSV, loadCSV
+#include "ods.h"       // saveODS, loadODS
+#include <cctype>      // std::isprint
 
 void App::onKey(KeyEvent e) {
     if (editing_) {
@@ -72,15 +74,15 @@ void App::onKey(KeyEvent e) {
             editBuf_ = c ? c->raw : "";
         }
         else if (e.ctrl && (e.ch == 's' || e.ch == 19))  // 19 = Ctrl+S raw code
-            sheet_.saveCSV("spreadsheet.csv");
+            saveCSV(sheet_, "spreadsheet.csv");
         else if (e.ctrl && (e.ch == 'o' || e.ch == 15)) {  // 15 = Ctrl+O raw code
-            sheet_.loadCSV("spreadsheet.csv");
+            loadCSV(sheet_, "spreadsheet.csv");
             sheet_.evaluateAll();
         }
         else if (e.ctrl && e.shift && (e.ch == 's' || e.ch == 'S'))
-            sheet_.saveODS("spreadsheet.ods");
+            saveODS(sheet_, "spreadsheet.ods");
         else if (e.ctrl && e.shift && (e.ch == 'o' || e.ch == 'O')) {
-            sheet_.loadODS("spreadsheet.ods");
+            loadODS(sheet_, "spreadsheet.ods");
             sheet_.evaluateAll();
         }
     }

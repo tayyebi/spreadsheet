@@ -6,8 +6,10 @@
 //   2. Grid cell clicks — move the selection (committing any in-progress edit)
 // =============================================================================
 
-#include "app.h"   // App declaration
-#include <string>  // std::string, std::to_string
+#include "mouse.h"  // paired header (includes app.h)
+#include "csv.h"    // saveCSV, loadCSV
+#include "ods.h"    // saveODS, loadODS
+#include <string>   // std::string, std::to_string
 
 // ---------------------------------------------------------------------------
 // colLabel()  —  convert a zero-based column index to an Excel-style label
@@ -32,10 +34,10 @@ void App::onMouse(MouseEvent e) {
             e.y >= btn.y && e.y < btn.y + btn.h) {
 
             if (btn.label == "Save") {
-                sheet_.saveCSV("spreadsheet.csv");
+                saveCSV(sheet_, "spreadsheet.csv");
 
             } else if (btn.label == "Load") {
-                sheet_.loadCSV("spreadsheet.csv");
+                loadCSV(sheet_, "spreadsheet.csv");
                 sheet_.evaluateAll();
                 editing_ = false;
                 editBuf_.clear();
@@ -55,10 +57,10 @@ void App::onMouse(MouseEvent e) {
                     editBuf_ = "=SUM()";
 
             } else if (btn.label == "SvODS") {
-                sheet_.saveODS("spreadsheet.ods");
+                saveODS(sheet_, "spreadsheet.ods");
 
             } else if (btn.label == "LdODS") {
-                sheet_.loadODS("spreadsheet.ods");
+                loadODS(sheet_, "spreadsheet.ods");
                 sheet_.evaluateAll();
                 editing_ = false;
                 editBuf_.clear();

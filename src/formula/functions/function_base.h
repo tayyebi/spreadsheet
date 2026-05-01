@@ -8,7 +8,7 @@
 #pragma once
 
 #include "formula.h"  // FunctionNode, EvalCtx, ASTNode
-#include "core.h"     // Spreadsheet, Cell — needed to read cell values
+#include "spreadsheet.h"  // Spreadsheet, Cell — needed to read cell values
 #include <vector>     // std::vector — returned by both helpers
 
 // ---------------------------------------------------------------------------
