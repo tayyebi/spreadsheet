@@ -23,6 +23,24 @@ static std::string CL(int c) {
 }
 
 // ---------------------------------------------------------------------------
+// isPrintableCh()  —  safe wrapper for std::isprint with char argument
+//
+// std::isprint(int) has undefined behaviour when passed a negative char value
+// (e.g. non-ASCII characters on platforms where char is signed).  Casting to
+// unsigned char first is the standard-conforming fix (see C++17 §[cctype]).
+// ---------------------------------------------------------------------------
+static bool isPrintableCh(char ch) {
+    return std::isprint(static_cast<unsigned char>(ch));
+}
+
+// ---------------------------------------------------------------------------
+// SIGMA_LABEL  —  UTF-8 encoding of the Greek capital letter Σ (U+03A3)
+//
+// Used as the toolbar label for the "insert SUM formula" button.
+// ---------------------------------------------------------------------------
+static constexpr const char* SIGMA_LABEL = "\xCE\xA3";
+
+// ---------------------------------------------------------------------------
 // cellName()  —  e.g. row=0, col=1  →  "B1"
 // ---------------------------------------------------------------------------
 static std::string cellName(int r, int c) {
@@ -77,7 +95,7 @@ void App::initToolbar() {
     add("I",     22);   // Italic (visual)
     add("U",     22);   // Underline (visual)
     sep();
-    add("\xCE\xA3", 28); // Σ — insert SUM formula (UTF-8 sigma)
+    add(SIGMA_LABEL, 28); // Σ — insert SUM formula
 }
 
 // ---------------------------------------------------------------------------
@@ -454,7 +472,7 @@ void App::toolbarAction(int idx) {
         doCopy();
     } else if (lbl == "Paste") {
         doPaste();
-    } else if (lbl == "\xCE\xA3") {
+    } else if (lbl == SIGMA_LABEL) {
         // Insert a SUM formula for the column above the selected cell.
         // Build =SUM(A1:A<selRow_>) if there are rows above; else just =SUM().
         std::string formula = "=SUM(";
@@ -560,7 +578,7 @@ void App::onKey(KeyEvent e) {
         } else if (e.ctrl && (e.ch == 'y' || (e.ch == 'z' && e.shift))) {
             cancelEdit();
             doRedo();
-        } else if (e.ch && std::isprint((unsigned char)e.ch) && !e.ctrl && !e.alt) {
+        } else if (e.ch && isPrintableCh(e.ch) && !e.ctrl && !e.alt) {
             editBuf_ += e.ch;
         }
     } else {
@@ -692,7 +710,7 @@ void App::onKey(KeyEvent e) {
             selRow_ = 0; selCol_ = 0;
             anchorRow_ = 0; anchorCol_ = 0;
 
-        } else if (!e.ctrl && !e.alt && e.ch && std::isprint((unsigned char)e.ch)) {
+        } else if (!e.ctrl && !e.alt && e.ch && isPrintableCh(e.ch)) {
             // Any printable character starts editing and is the first char.
             editing_ = true;
             editBuf_ = std::string(1, e.ch);
