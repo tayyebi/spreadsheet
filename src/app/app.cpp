@@ -35,10 +35,12 @@ App::App(IWindow& w) : win_(w) {
     // Toolbar buttons: y=4, height=TB-8=24, width=60, gap=4 between buttons.
     int bh = TB - 8;
     buttons_ = {
-        {   4, 4, 60, bh, "Save"  },  // Ctrl+S equivalent
-        {  68, 4, 60, bh, "Load"  },  // Ctrl+O equivalent
-        { 132, 4, 60, bh, "Clear" },  // Delete cell contents
-        { 196, 4, 60, bh, "Sum"   },  // Insert SUM formula
+        {   4, 4, 60, bh, "Save"   },  // Ctrl+S: save CSV
+        {  68, 4, 60, bh, "Load"   },  // Ctrl+O: load CSV
+        { 132, 4, 60, bh, "Clear"  },  // Delete cell contents
+        { 196, 4, 60, bh, "Sum"    },  // Insert SUM formula
+        { 264, 4, 68, bh, "SvODS"  },  // Ctrl+Shift+S: save ODS
+        { 336, 4, 68, bh, "LdODS"  },  // Ctrl+Shift+O: load ODS
     };
 }
 
@@ -47,16 +49,16 @@ App::App(IWindow& w) : win_(w) {
 //
 // Layout (all dimensions in pixels):
 //
-//   y=0        ┌──────────────────────────────────────────────────┐
-//              │  [Save]  [Load]  [Clear]  [Sum]                  │ ← toolbar (TB=32)
-//   y=TB       ├──────┬───────────────────────────────────────────┤
-//              │  A1  │  =SUM(A1:A3)                              │ ← formula bar (FB=25)
-//   y=TB+FB    ├──────┬──────┬──────┬────┬──────┐                │
-//              │      │  A   │  B   │ …  │  J   │                │ ← column headers (HH=20)
-//   y=TB+FB+HH ├──────┼──────┼──────┼────┼──────┤                │
-//              │  1   │      │      │    │      │                │ ← data rows (CH=25 each)
-//              │  2   │      │      │    │      │                │
-//              │  …   │      │      │    │      │                │
+//   y=0        ┌──────────────────────────────────────────────────────────────┐
+//              │  [Save] [Load] [Clear] [Sum] [SvODS] [LdODS]               │ ← toolbar (TB=32)
+//   y=TB       ├──────┬───────────────────────────────────────────────────────┤
+//              │  A1  │  =SUM(A1:A3)                                         │ ← formula bar (FB=25)
+//   y=TB+FB    ├──────┬──────┬──────┬────┬──────┐                           │
+//              │      │  A   │  B   │ …  │  J   │                           │ ← column headers (HH=20)
+//   y=TB+FB+HH ├──────┼──────┼──────┼────┼──────┤                           │
+//              │  1   │      │      │    │      │                           │ ← data rows (CH=25 each)
+//              │  2   │      │      │    │      │                           │
+//              │  …   │      │      │    │      │                           │
 //
 // The selected cell gets a thick 3-pixel blue border.
 // In editing mode the selected cell has a yellow background and shows
@@ -183,14 +185,16 @@ void App::render() {
 // App::onKey()  —  handle one keyboard event
 //
 //   NAVIGATION mode (editing_ == false)
-//     Arrow keys  → move the selection cursor
-//     Tab         → move one column right
-//     Home        → jump to column A
-//     End         → jump to last column
-//     Enter / F2  → enter edit mode for the selected cell
-//     Delete      → clear the selected cell
-//     Ctrl+S      → save the grid to "spreadsheet.csv"
-//     Ctrl+O      → load the grid from "spreadsheet.csv" and re-evaluate
+//     Arrow keys    → move the selection cursor
+//     Tab           → move one column right
+//     Home          → jump to column A
+//     End           → jump to last column
+//     Enter / F2    → enter edit mode for the selected cell
+//     Delete        → clear the selected cell
+//     Ctrl+S        → save the grid to "spreadsheet.csv"
+//     Ctrl+O        → load the grid from "spreadsheet.csv" and re-evaluate
+//     Ctrl+Shift+S  → save the grid to "spreadsheet.ods" (OpenDocument)
+//     Ctrl+Shift+O  → load "spreadsheet.ods" and re-evaluate
 //
 //   EDIT mode (editing_ == true)
 //     Printable chars → append to editBuf_
@@ -259,6 +263,14 @@ void App::onKey(KeyEvent e) {
             sheet_.loadCSV("spreadsheet.csv");
             sheet_.evaluateAll();
         }
+        // Ctrl+Shift+S/O — ODS save/load.
+        // Ctrl+Shift+S may deliver 's' (normalised) with shift=true, or 'S'.
+        else if (e.ctrl && e.shift && (e.ch == 's' || e.ch == 'S'))
+            sheet_.saveODS("spreadsheet.ods");
+        else if (e.ctrl && e.shift && (e.ch == 'o' || e.ch == 'O')) {
+            sheet_.loadODS("spreadsheet.ods");
+            sheet_.evaluateAll();
+        }
     }
 
     render();  // repaint after every event regardless of what changed
@@ -304,6 +316,17 @@ void App::onMouse(MouseEvent e) {
                                CL(selCol_) + std::to_string(selRow_) + ")";
                 else
                     editBuf_ = "=SUM()";
+
+            } else if (btn.label == "SvODS") {
+                // Save to OpenDocument Spreadsheet format (.ods).
+                sheet_.saveODS("spreadsheet.ods");
+
+            } else if (btn.label == "LdODS") {
+                // Load from OpenDocument Spreadsheet format (.ods).
+                sheet_.loadODS("spreadsheet.ods");
+                sheet_.evaluateAll();
+                editing_ = false;
+                editBuf_.clear();
             }
 
             render();

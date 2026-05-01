@@ -117,6 +117,20 @@ public:
     // Returns true on success, false if the file could not be opened.
     bool loadCSV(const std::string& path);
 
+    // Write the grid to an OpenDocument Spreadsheet (.ods) file.
+    // The ODS archive is written using ZIP STORE (no compression) so that no
+    // external library is required.  LibreOffice and compatible suites can
+    // open the resulting file directly.
+    // Returns true on success, false if the file could not be written.
+    bool saveODS(const std::string& path) const;
+
+    // Read an OpenDocument Spreadsheet (.ods) file and populate the grid.
+    // Only ZIP STORE (uncompressed) entries are supported; ODS files saved
+    // by LibreOffice use DEFLATE and cannot be loaded with this method.
+    // Use saveODS() to create files that loadODS() can later read back.
+    // Returns true on success, false on error.
+    bool loadODS(const std::string& path);
+
 private:
     // Sparse map from encoded key → Cell.
     // Only cells that have been written to exist as entries.
