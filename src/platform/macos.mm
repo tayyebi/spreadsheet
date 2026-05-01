@@ -35,9 +35,9 @@ class MacWin;  // forward declaration so SpV (an Obj-C class) can reference it
 // ---------------------------------------------------------------------------
 // SpV  —  the custom NSView that owns drawing and key handling
 //
-// We subclass NSView so we can override drawRect: (for painting) and
-// keyDown: (for keyboard events).  The view holds a pointer back to MacWin
-// so it can forward events to the C++ layer.
+// We subclass NSView so we can override drawRect: (for painting), keyDown:
+// (for keyboard events), and mouseDown: (for mouse clicks).  The view holds
+// a pointer back to MacWin so it can forward events to the C++ layer.
 // ---------------------------------------------------------------------------
 @interface SpV : NSView {
     MacWin* mw_;  // pointer to the owning MacWin (not reference-counted)
@@ -150,7 +150,7 @@ public:
 
     void handleInput(std::function<void(KeyEvent)> f) override { kcb = std::move(f); }
     void handleMouse(std::function<void(MouseEvent)> f) override { mcb = std::move(f); }
-    void setRCB(std::function<void()> f)                        { rcb = std::move(f); }
+    void setRCB(std::function<void()> f)                       { rcb = std::move(f); }
 
     // Start the Cocoa run loop.  Blocks until the application quits.
     void run() override { [NSApp run]; }
@@ -172,6 +172,7 @@ public:
         NSUInteger   m = [ev modifierFlags];
         ke.ctrl  = (m & NSEventModifierFlagControl) != 0;
         ke.shift = (m & NSEventModifierFlagShift)   != 0;
+        ke.alt   = (m & NSEventModifierFlagOption)  != 0;
 
         // Get the character ignoring modifiers (so Shift+A gives 'a', not 'A').
         NSString* raw = [ev charactersIgnoringModifiers];
@@ -190,15 +191,18 @@ public:
             case NSDownArrowFunctionKey:  ke.key = KEY_DOWN;      ke.ch = 0; break;
             case NSLeftArrowFunctionKey:  ke.key = KEY_LEFT;      ke.ch = 0; break;
             case NSRightArrowFunctionKey: ke.key = KEY_RIGHT;     ke.ch = 0; break;
-            case NSDeleteFunctionKey:     ke.key = KEY_DELETE;    ke.ch = 0; break;
-            case '\t':                    ke.key = KEY_TAB;       ke.ch = 0; break;
+            case NSF2FunctionKey:         ke.key = KEY_F2;        ke.ch = 0; break;
+            case NSF5FunctionKey:         ke.key = KEY_F5;        ke.ch = 0; break;
             case NSHomeFunctionKey:       ke.key = KEY_HOME;      ke.ch = 0; break;
             case NSEndFunctionKey:        ke.key = KEY_END;       ke.ch = 0; break;
-            case NSF2FunctionKey:         ke.key = KEY_F2;        ke.ch = 0; break;
+            case NSPageUpFunctionKey:     ke.key = KEY_PGUP;      ke.ch = 0; break;
+            case NSPageDownFunctionKey:   ke.key = KEY_PGDN;      ke.ch = 0; break;
+            case NSDeleteFunctionKey:     ke.key = KEY_DELETE;    ke.ch = 0; break;
             case '\r': case '\n':         ke.key = KEY_ENTER;                break;
             case 0x1B:                    ke.key = KEY_ESC;                  break;
             case NSDeleteCharacter:
             case NSBackspaceCharacter:    ke.key = KEY_BACKSPACE;            break;
+            case '\t':                    ke.key = KEY_TAB;      ke.ch = '\t'; break;
             default:                      ke.key = (ch < 128) ? int(ch) : 0; break;
         }
 
@@ -206,17 +210,18 @@ public:
     }
 
     // -----------------------------------------------------------------------
-    // onMouseDown()  —  translate an NSEvent mouse click to a MouseEvent
+    // onMouse()  —  translate an NSEvent mouse press into a MouseEvent
     // -----------------------------------------------------------------------
-    void onMouseDown(NSEvent* ev) {
+    void onMouse(NSEvent* ev) {
         if (!mcb) return;
-        // Convert from window coordinates (Cocoa: origin bottom-left) to our
-        // top-left coordinate system by flipping the y axis.
+        // Convert from NSWindow coordinates (bottom-left origin) to our
+        // top-left-origin pixel coordinates.
         NSPoint p = [v convertPoint:[ev locationInWindow] fromView:nil];
         MouseEvent me{};
-        me.x      = (int)p.x;
-        me.y      = H - (int)p.y;  // flip: CG y is from bottom, our API is from top
-        me.button = 1;              // mouseDown: is always left button
+        me.x       = (int)p.x;
+        me.y       = H - (int)p.y;  // flip: CG y=0 is bottom, our y=0 is top
+        me.button  = 1;
+        me.pressed = true;
         mcb(me);
     }
 };
@@ -243,9 +248,9 @@ public:
     if (mw_) mw_->onKey(ev);
 }
 
-// Forward left-button mouse clicks to MacWin::onMouseDown().
+// Forward mouse press events to MacWin::onMouse().
 - (void)mouseDown:(NSEvent*)ev {
-    if (mw_) mw_->onMouseDown(ev);
+    if (mw_) mw_->onMouse(ev);
 }
 
 // Must return YES so that the view can become the first responder
@@ -265,9 +270,10 @@ int main() {
         MacWin win(w, h);
         App    app(win);
 
-        win.setRCB([&] { app.render(); });  // connect drawRect: → App::render()
-        app.render();                        // draw the initial grid
-        win.run();                           // enter the Cocoa run loop
+        win.setRCB([&] { app.render(); });               // connect drawRect: → App::render()
+        win.handleMouse([&](MouseEvent e) { app.onMouse(e); });
+        app.render();                                     // draw the initial grid
+        win.run();                                        // enter the Cocoa run loop
     }
     return 0;
 }

@@ -1,91 +1,60 @@
 // =============================================================================
 // mouse.cpp  —  App::onMouse(): handle one mouse button press event
-//
-// Handles two kinds of left-button clicks:
-//   1. Toolbar button clicks — trigger the corresponding action
-//   2. Grid cell clicks — move the selection (committing any in-progress edit)
 // =============================================================================
 
 #include "mouse.h"  // paired header (includes app.h)
-#include "csv.h"    // saveCSV, loadCSV
-#include "ods.h"    // saveODS, loadODS
-#include <string>   // std::string, std::to_string
-
-// ---------------------------------------------------------------------------
-// colLabel()  —  convert a zero-based column index to an Excel-style label
-//   0 → "A", 1 → "B", …, 25 → "Z", 26 → "AA", …
-// ---------------------------------------------------------------------------
-static std::string colLabel(int c) {
-    std::string s;
-    int n = c + 1;
-    while (n > 0) {
-        s  = char('A' + (n - 1) % 26) + s;
-        n  = (n - 1) / 26;
-    }
-    return s;
-}
 
 void App::onMouse(MouseEvent e) {
-    if (e.button != 1) return;  // left-button clicks only
+    if (!e.pressed) return;  // ignore release events
 
-    // Check toolbar button hits.
-    for (const auto& btn : buttons_) {
-        if (e.x >= btn.x && e.x < btn.x + btn.w &&
-            e.y >= btn.y && e.y < btn.y + btn.h) {
+    int x = e.x, y = e.y;
 
-            if (btn.label == "Save") {
-                saveCSV(sheet_, "spreadsheet.csv");
-
-            } else if (btn.label == "Load") {
-                loadCSV(sheet_, "spreadsheet.csv");
-                sheet_.evaluateAll();
-                editing_ = false;
-                editBuf_.clear();
-
-            } else if (btn.label == "Clear") {
-                editing_ = false;
-                editBuf_.clear();
-                sheet_.setCell(selRow_, selCol_, "");
-                sheet_.evaluateAll();
-
-            } else if (btn.label == "Sum") {
-                editing_ = true;
-                if (selRow_ > 0)
-                    editBuf_ = "=SUM(" + colLabel(selCol_) + "1:" +
-                               colLabel(selCol_) + std::to_string(selRow_) + ")";
-                else
-                    editBuf_ = "=SUM()";
-
-            } else if (btn.label == "SvODS") {
-                saveODS(sheet_, "spreadsheet.ods");
-
-            } else if (btn.label == "LdODS") {
-                loadODS(sheet_, "spreadsheet.ods");
-                sheet_.evaluateAll();
-                editing_ = false;
-                editBuf_.clear();
+    // --- Toolbar click ---
+    if (y < TB) {
+        for (int i = 0; i < (int)toolBtns_.size(); ++i) {
+            const auto& btn = toolBtns_[i];
+            if (btn.label == "|") continue;
+            if (x >= btn.x && x < btn.x + btn.w &&
+                y >= btn.y && y < btn.y + btn.h) {
+                if (editing_) commitEdit();
+                toolbarAction(i);
+                render();
+                return;
             }
-
-            render();
-            return;
         }
+        return;
     }
 
-    // Check grid cell clicks (below toolbar + formula bar + column headers).
-    int gridY = TB + FB + HH;
-    if (e.x >= HW && e.y >= gridY) {
-        int c = (e.x - HW) / CW;
-        int r = (e.y - gridY) / CH;
-        if (r >= 0 && r < Spreadsheet::ROWS && c >= 0 && c < Spreadsheet::COLS) {
-            if (editing_) {
-                sheet_.setCell(selRow_, selCol_, editBuf_);
-                sheet_.evaluateAll();
-                editing_ = false;
-                editBuf_.clear();
-            }
-            selRow_ = r;
-            selCol_ = c;
-            render();
+    // --- Formula bar click → enter edit mode for selected cell ---
+    if (y >= TB && y < TB + FB) {
+        if (!editing_) {
+            editing_ = true;
+            const Cell* c = sheet_.getCell(selRow_, selCol_);
+            editBuf_ = c ? c->raw : "";
         }
+        render();
+        return;
     }
+
+    // --- Grid click ---
+    constexpr int GY = TB + FB;
+    if (y < GY + HH) {
+        render();
+        return;
+    }
+
+    int row = (y - GY - HH) / CH;
+    int col = (x - HW)       / CW;
+
+    if (row < 0 || row >= Spreadsheet::ROWS) { render(); return; }
+    if (col < 0 || col >= Spreadsheet::COLS) { render(); return; }
+
+    if (editing_) commitEdit();
+
+    bool shift = false;
+    selRow_ = row;
+    selCol_ = col;
+    if (!shift) { anchorRow_ = row; anchorCol_ = col; }
+
+    render();
 }

@@ -23,18 +23,6 @@
 struct Color { uint8_t r, g, b; };
 
 // ---------------------------------------------------------------------------
-// MouseEvent  —  a normalised mouse button event
-//
-//   x, y    – cursor position in window coordinates (origin top-left, y down)
-//   button  – which button was pressed: 1 = left, 2 = middle, 3 = right
-// ---------------------------------------------------------------------------
-struct MouseEvent {
-    int x      = 0;
-    int y      = 0;
-    int button = 0;
-};
-
-// ---------------------------------------------------------------------------
 // KeyEvent  —  a normalised keyboard event
 //
 // The platform translates its native key representation into this struct
@@ -45,12 +33,28 @@ struct MouseEvent {
 //   ch    – the ASCII character for printable keys (0 for special keys)
 //   ctrl  – true if the Control modifier was held
 //   shift – true if the Shift modifier was held
+//   alt   – true if the Alt/Option modifier was held
 // ---------------------------------------------------------------------------
 struct KeyEvent {
     int  key   = 0;
     char ch    = 0;
     bool ctrl  = false;
     bool shift = false;
+    bool alt   = false;
+};
+
+// ---------------------------------------------------------------------------
+// MouseEvent  —  a normalised mouse event
+//
+//   x, y    – cursor position in window pixels (top-left origin)
+//   button  – 1=left, 2=middle, 3=right
+//   pressed – true on button press, false on button release
+// ---------------------------------------------------------------------------
+struct MouseEvent {
+    int  x       = 0;
+    int  y       = 0;
+    int  button  = 0;
+    bool pressed = true;
 };
 
 // ---------------------------------------------------------------------------
@@ -89,8 +93,9 @@ public:
     virtual void handleInput(std::function<void(KeyEvent)> cb) = 0;
 
     // Register the callback that will be called for every mouse button event.
-    // Only one callback is active at a time (the last one registered wins).
-    virtual void handleMouse(std::function<void(MouseEvent)> cb) = 0;
+    // Default is a no-op so platforms that do not yet implement mouse events
+    // still compile without changes.
+    virtual void handleMouse(std::function<void(MouseEvent)> cb) { (void)cb; }
 
     // Start the platform event loop.  Blocks until the window is closed.
     virtual void run() = 0;
@@ -98,20 +103,23 @@ public:
     // -----------------------------------------------------------------------
     // Virtual key code constants
     //
-    // Arrow keys are assigned values above the 8-bit ASCII range (0x100+)
-    // so they can coexist with regular character codes in the same int field.
-    // Control characters (Enter, Escape, Backspace) use their ASCII values.
+    // Arrow keys and function keys are assigned values above the 8-bit ASCII
+    // range (0x100+) so they can coexist with regular character codes.
+    // Control characters (Enter, Escape, Backspace, Tab) use their ASCII values.
     // -----------------------------------------------------------------------
     static constexpr int KEY_UP        = 0x100;   // ↑ arrow
     static constexpr int KEY_DOWN      = 0x101;   // ↓ arrow
     static constexpr int KEY_LEFT      = 0x102;   // ← arrow
     static constexpr int KEY_RIGHT     = 0x103;   // → arrow
-    static constexpr int KEY_DELETE    = 0x104;   // Delete (forward delete)
+    static constexpr int KEY_F2        = 0x104;   // F2  — enter edit mode
     static constexpr int KEY_HOME      = 0x105;   // Home
     static constexpr int KEY_END       = 0x106;   // End
-    static constexpr int KEY_F2        = 0x107;   // F2 (enter edit mode)
+    static constexpr int KEY_PGUP      = 0x107;   // Page Up
+    static constexpr int KEY_PGDN      = 0x108;   // Page Down
+    static constexpr int KEY_F5        = 0x109;   // F5  — go-to cell
     static constexpr int KEY_ENTER     = '\r';    // Carriage Return (13)
     static constexpr int KEY_ESC       = 0x1B;    // Escape (27)
     static constexpr int KEY_BACKSPACE = 0x08;    // Backspace (8)
     static constexpr int KEY_TAB       = '\t';    // Tab (9)
+    static constexpr int KEY_DELETE    = 0x7F;    // Forward-Delete / Del key
 };
