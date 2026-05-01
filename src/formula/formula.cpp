@@ -15,7 +15,7 @@
 // =============================================================================
 
 #include "formula.h"  // AST declarations, EvalCtx, FormulaResult
-#include "core.h"     // Spreadsheet, Cell — needed for CellRefNode::eval
+#include "spreadsheet.h"  // Spreadsheet, Cell — needed for CellRefNode::eval
 #include <cctype>     // isdigit, isupper, isspace — character classification
 #include <stdexcept>  // std::stod, std::stoi may throw std::invalid_argument
 

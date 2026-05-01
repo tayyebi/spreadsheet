@@ -9,7 +9,7 @@
 // =============================================================================
 #pragma once
 #include "platform.h"  // IWindow, KeyEvent, MouseEvent, Color
-#include "core.h"      // Spreadsheet, Cell
+#include "spreadsheet.h" // Spreadsheet, Cell
 
 #include <string>
 #include <vector>

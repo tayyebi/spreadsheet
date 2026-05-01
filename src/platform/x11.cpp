@@ -186,21 +186,29 @@ public:
                     case XK_Down:      ke.key = KEY_DOWN;      ke.ch = 0; break;
                     case XK_Left:      ke.key = KEY_LEFT;      ke.ch = 0; break;
                     case XK_Right:     ke.key = KEY_RIGHT;     ke.ch = 0; break;
+                    case XK_Delete:    ke.key = KEY_DELETE;    ke.ch = 0; break;
+                    case XK_Tab:       ke.key = KEY_TAB;       ke.ch = '\t'; break;
+                    case XK_Home:      ke.key = KEY_HOME;      ke.ch = 0; break;
+                    case XK_End:       ke.key = KEY_END;       ke.ch = 0; break;
+                    case XK_F2:        ke.key = KEY_F2;        ke.ch = 0; break;
+                    case XK_F5:        ke.key = KEY_F5;        ke.ch = 0; break;
+                    case XK_Page_Up:   ke.key = KEY_PGUP;      ke.ch = 0; break;
+                    case XK_Page_Down: ke.key = KEY_PGDN;      ke.ch = 0; break;
                     case XK_Return:    ke.key = KEY_ENTER;                break;
                     case XK_Escape:    ke.key = KEY_ESC;                  break;
                     case XK_BackSpace: ke.key = KEY_BACKSPACE;            break;
-                    case XK_Tab:       ke.key = KEY_TAB;       ke.ch = '\t'; break;
-                    case XK_Delete:    ke.key = KEY_DELETE;    ke.ch = 0; break;
-                    case XK_F2:        ke.key = KEY_F2;        ke.ch = 0; break;
-                    case XK_F5:        ke.key = KEY_F5;        ke.ch = 0; break;
-                    case XK_Home:      ke.key = KEY_HOME;      ke.ch = 0; break;
-                    case XK_End:       ke.key = KEY_END;       ke.ch = 0; break;
-                    case XK_Page_Up:   ke.key = KEY_PGUP;      ke.ch = 0; break;
-                    case XK_Page_Down: ke.key = KEY_PGDN;      ke.ch = 0; break;
                     default:           ke.key = int(buf8[0]);             break;
                 }
 
                 if (kcb) kcb(ke);
+            } else if (ev.type == ButtonPress) {
+                // Translate X11 button event to a platform-independent MouseEvent.
+                // X button numbers: 1=left, 2=middle, 3=right.
+                MouseEvent me{};
+                me.x      = ev.xbutton.x;
+                me.y      = ev.xbutton.y;
+                me.button = (int)ev.xbutton.button;
+                if (mcb) mcb(me);
             }
         }
     }

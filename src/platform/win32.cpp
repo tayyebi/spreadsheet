@@ -211,6 +211,17 @@ public:
             inst->kcb(ke);
             return 0;
         }
+        case WM_LBUTTONDOWN: {
+            // Left mouse button pressed: translate to a MouseEvent.
+            if (inst->mcb) {
+                MouseEvent me{};
+                me.x      = (int)(short)LOWORD(lp);  // cursor x in client coords
+                me.y      = (int)(short)HIWORD(lp);  // cursor y in client coords
+                me.button = 1;
+                inst->mcb(me);
+            }
+            return 0;
+        }
         case WM_CHAR: {
             // WM_CHAR carries the translated character code (including Ctrl codes).
             if (!inst->kcb) break;

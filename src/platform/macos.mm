@@ -43,6 +43,7 @@ class MacWin;  // forward declaration so SpV (an Obj-C class) can reference it
     MacWin* mw_;  // pointer to the owning MacWin (not reference-counted)
 }
 - (instancetype)initWithFrame:(NSRect)f mw:(MacWin*)m;  // designated initialiser
+- (void)mouseDown:(NSEvent*)ev;
 @end
 
 // ---------------------------------------------------------------------------
