@@ -226,7 +226,7 @@ void App::onKey(KeyEvent e) {
         } else if (e.key == IWindow::KEY_BACKSPACE) {
             // Delete the last character (if any).
             if (!editBuf_.empty()) editBuf_.pop_back();
-        } else if (e.ch && std::isprint((unsigned)e.ch) && !e.ctrl) {
+        } else if (e.ch && std::isprint(static_cast<unsigned char>(e.ch)) && !e.ctrl) {
             // Append any printable non-control character to the buffer.
             editBuf_ += e.ch;
         }

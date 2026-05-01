@@ -407,9 +407,9 @@ static std::vector<uint8_t> buildZip(
 }
 
 // ---------------------------------------------------------------------------
-// xmlEsc()  —  escape the five special XML characters
-//   &  →  &amp;   <  →  &lt;   >  →  &gt;
-//   "  →  &quot;  '  →  &apos;
+// xmlEsc()  —  escape the XML characters that must be encoded in text content
+//              and double-quoted attribute values
+//   &  →  &amp;   <  →  &lt;   >  →  &gt;   "  →  &quot;
 // ---------------------------------------------------------------------------
 static std::string xmlEsc(const std::string& s) {
     std::string out;
@@ -464,15 +464,6 @@ static std::string xmlUnesc(std::string s) {
 //   • Empty cells use a self-closing <table:table-cell/> tag.
 // ---------------------------------------------------------------------------
 static std::string makeContentXML(const Spreadsheet& sheet) {
-    // Column label helper (0 → "A", 1 → "B", …).
-    auto colLabel = [](int c) {
-        std::string s;
-        int n = c + 1;
-        while (n > 0) { s = char('A' + (n - 1) % 26) + s; n = (n - 1) / 26; }
-        return s;
-    };
-    (void)colLabel;  // used only when adding formula namespace; silence warning
-
     std::string x;
     x += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
     x += "<office:document-content"
