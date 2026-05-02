@@ -39,39 +39,10 @@ App::App(IWindow& w) : win_(w) {
 }
 
 // ---------------------------------------------------------------------------
-// App::initToolbar()  —  build the toolbar button list
+// App::initToolbar()  —  TUI: no pixel-positioned buttons needed.
+// The toolbar is rendered as a static key-shortcut help line.
 // ---------------------------------------------------------------------------
-void App::initToolbar() {
-    constexpr int BH = 22;  // button height
-    constexpr int BY =  5;  // top y inside toolbar
-
-    int x = 4;
-    auto add = [&](const std::string& lbl, int w) {
-        toolBtns_.push_back({x, BY, w, BH, lbl, true});
-        x += w + 3;
-    };
-    auto sep = [&]() {
-        toolBtns_.push_back({x, BY, 1, BH, "|", false});
-        x += 7;
-    };
-
-    add("New",   36);
-    add("Open",  42);
-    add("Save",  38);
-    sep();
-    add("Undo",  38);
-    add("Redo",  38);
-    sep();
-    add("Cut",   32);
-    add("Copy",  42);
-    add("Paste", 46);
-    sep();
-    add("B",     22);
-    add("I",     22);
-    add("U",     22);
-    sep();
-    add(SIGMA_LABEL, 28);
-}
+void App::initToolbar() {}
 
 // ---------------------------------------------------------------------------
 // App::selRect()  —  normalised selection rectangle
