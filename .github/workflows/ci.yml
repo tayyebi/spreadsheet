@@ -1,5 +1,5 @@
 name: CI
-on: [push,pull_request] # trigger
+on: [push] # trigger
 permissions:
   contents: read # min perms
 jobs:
