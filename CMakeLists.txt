@@ -29,7 +29,7 @@ set(SOURCES
     # Core data model — one source file per responsibility:
     src/core/spreadsheet.cpp   # grid storage and formula evaluation
     src/core/csv.cpp           # CSV (RFC-4180) persistence
-    src/core/ods.cpp           # OpenDocument Spreadsheet (.ods) persistence
+    src/core/ods.cpp           # Custom binary SSHEET persistence
     src/formula/formula.cpp
     # Shared helpers used by every formula function:
     src/formula/functions/function_base.cpp

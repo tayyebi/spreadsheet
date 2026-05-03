@@ -9,7 +9,7 @@
 //
 // Persistence is handled by separate single-purpose modules:
 //   csv.h / csv.cpp — CSV (RFC-4180) read/write (free functions)
-//   ods.h / ods.cpp — OpenDocument Spreadsheet (.ods) read/write (free functions)
+//   ods.h / ods.cpp — Custom binary SSHEET format read/write (free functions)
 // =============================================================================
 #pragma once
 
