@@ -91,25 +91,33 @@ void App::onKey(KeyEvent e) {
         } else if (e.key == IWindow::KEY_HOME && !e.ctrl) {
             selCol_ = 0;
             if (!e.shift) anchorCol_ = 0;
+            scrollToSel();
 
         } else if (e.key == IWindow::KEY_END && !e.ctrl) {
             int lastC = 0;
-            for (int c = 0; c < Spreadsheet::COLS; ++c)
+            for (int c = 0; c < cols_; ++c)
                 if (!rawOf(selRow_, c).empty()) lastC = c;
             selCol_ = lastC;
             if (!e.shift) anchorCol_ = lastC;
+            scrollToSel();
 
         } else if (e.key == IWindow::KEY_HOME && e.ctrl) {
             selRow_ = 0; selCol_ = 0;
             if (!e.shift) { anchorRow_ = 0; anchorCol_ = 0; }
+            scrollToSel();
 
         } else if (e.key == IWindow::KEY_END && e.ctrl) {
             int lastR = 0, lastC = 0;
-            for (int r = 0; r < Spreadsheet::ROWS; ++r)
-                for (int c = 0; c < Spreadsheet::COLS; ++c)
-                    if (!rawOf(r, c).empty()) { lastR = r; lastC = c; }
+            // forEachCell visits all sparse-map entries, including cells set to ""
+            // via setCellWithUndo(r,c,""). We only want cells with actual content.
+            sheet_.forEachCell([&](int r, int c, const Cell& cell) {
+                if (!cell.raw.empty()) {
+                    if (r > lastR || (r == lastR && c > lastC)) { lastR = r; lastC = c; }
+                }
+            });
             selRow_ = lastR; selCol_ = lastC;
             if (!e.shift) { anchorRow_ = lastR; anchorCol_ = lastC; }
+            scrollToSel();
 
         } else if (e.key == IWindow::KEY_PGUP) {
             constexpr int PAGE = 10;
@@ -121,8 +129,9 @@ void App::onKey(KeyEvent e) {
 
         } else if (e.ctrl && e.ch == 'a') {
             anchorRow_ = 0; anchorCol_ = 0;
-            selRow_ = Spreadsheet::ROWS - 1;
-            selCol_ = Spreadsheet::COLS - 1;
+            selRow_ = rows_ - 1;
+            selCol_ = cols_ - 1;
+            scrollToSel();
 
         } else if (e.ctrl && e.ch == 'c') {
             doCopy();
@@ -153,13 +162,14 @@ void App::onKey(KeyEvent e) {
             sheet_.evaluateAll();
 
         } else if (e.ctrl && e.ch == 'n') {
-            for (int r = 0; r < Spreadsheet::ROWS; ++r)
-                for (int c = 0; c < Spreadsheet::COLS; ++c)
-                    if (!rawOf(r, c).empty())
-                        setCellWithUndo(r, c, "");
+            sheet_.forEachCell([&](int r, int c, const Cell& cell) {
+                if (!cell.raw.empty())
+                    setCellWithUndo(r, c, "");
+            });
             sheet_.evaluateAll();
             selRow_ = 0; selCol_ = 0;
             anchorRow_ = 0; anchorCol_ = 0;
+            viewRow_ = 0; viewCol_ = 0;
 
         } else if (!e.ctrl && !e.alt && e.ch && isPrintableCh(e.ch)) {
             editing_ = true;

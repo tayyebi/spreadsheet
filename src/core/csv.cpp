@@ -29,17 +29,29 @@ static std::string E(const std::string& s) {
 }
 
 // ---------------------------------------------------------------------------
-// saveCSV()  —  write the grid to a CSV file
+// saveCSV()  —  write non-empty cells to a CSV file
 //
-// Writes ROWS lines, each containing COLS comma-separated fields holding
-// the raw cell strings.  Empty cells produce an empty field.
+// Finds the bounding box of non-empty cells, then writes that rectangle.
+// Empty cells produce an empty field; the file always contains a proper
+// rectangular grid up to (maxRow × maxCol) so it can be re-loaded cleanly.
 // ---------------------------------------------------------------------------
 bool saveCSV(const Spreadsheet& sheet, const std::string& path) {
+    // Find bounding box of non-empty cells.
+    int maxR = -1, maxC = -1;
+    sheet.forEachCell([&](int r, int c, const Cell& cell) {
+        if (!cell.raw.empty()) {
+            if (r > maxR) maxR = r;
+            if (c > maxC) maxC = c;
+        }
+    });
+
+    if (maxR < 0) return true;  // grid has no non-empty cells — nothing to write
+
     std::ofstream f(path);
     if (!f) return false;
 
-    for (int r = 0; r < Spreadsheet::ROWS; ++r) {
-        for (int c = 0; c < Spreadsheet::COLS; ++c) {
+    for (int r = 0; r <= maxR; ++r) {
+        for (int c = 0; c <= maxC; ++c) {
             if (c > 0) f << ',';
             const Cell* cell = sheet.getCell(r, c);
             if (cell) f << E(cell->raw);
@@ -63,11 +75,11 @@ bool loadCSV(Spreadsheet& sheet, const std::string& path) {
 
     std::string line;
     int r = 0;
-    while (std::getline(f, line) && r < Spreadsheet::ROWS) {
+    while (std::getline(f, line) && r < Spreadsheet::MAX_ROWS) {
         int    c = 0;
         size_t i = 0;
 
-        while (i <= line.size() && c < Spreadsheet::COLS) {
+        while (i <= line.size() && c < Spreadsheet::MAX_COLS) {
             std::string fld;
 
             if (i < line.size() && line[i] == '"') {

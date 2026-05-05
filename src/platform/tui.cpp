@@ -12,7 +12,7 @@
 // =============================================================================
 
 #include "platform.h"   // IWindow, Color, KeyEvent, MouseEvent
-#include "app.h"        // App, Spreadsheet (for grid dimensions)
+#include "app.h"        // App
 
 // ---------------------------------------------------------------------------
 // Platform-specific includes
@@ -24,20 +24,16 @@
 #else
 #  include <termios.h>      // termios, tcgetattr, tcsetattr
 #  include <unistd.h>       // read(), STDIN_FILENO, STDOUT_FILENO
+#  include <sys/ioctl.h>    // ioctl, TIOCGWINSZ
 #  include <sys/select.h>   // select() — timeout-based stdin probe
 #endif
 
 #include <cstdio>           // fwrite, fflush, snprintf, fputs
 #include <cstring>          // std::strlen
 #include <string>
+#include <vector>
 #include <functional>
 #include <stdexcept>
-
-// ---------------------------------------------------------------------------
-// Screen dimensions  (in character cells)
-// ---------------------------------------------------------------------------
-static constexpr int SCR_W = App::HW + Spreadsheet::COLS * App::CW;
-static constexpr int SCR_H = App::TB + App::FB + App::HH + Spreadsheet::ROWS * App::CH;
 
 // ---------------------------------------------------------------------------
 // ScreenCell  —  one character slot in the back-buffer
@@ -68,10 +64,14 @@ static void tuiWrite(const char* s, std::size_t n) {
 class TuiWindow : public IWindow {
     bool raw_mode_ = false;
 
-    // Two character grids: current frame and previously displayed frame.
-    ScreenCell buf_ [SCR_H][SCR_W];
-    ScreenCell prev_[SCR_H][SCR_W];
-    bool       first_frame_ = true;
+    // Screen dimensions (terminal character cells).  Updated on each frame.
+    int scr_w_ = 80;
+    int scr_h_ = 24;
+
+    // Two flat character grids: current frame and previously displayed frame.
+    std::vector<ScreenCell> buf_;
+    std::vector<ScreenCell> prev_;
+    bool first_frame_ = true;
 
     std::function<void(KeyEvent)>   kcb_;
     std::function<void(MouseEvent)> mcb_;
@@ -200,6 +200,18 @@ class TuiWindow : public IWindow {
 
     struct termios saved_termios_{};
 
+    // Query the actual terminal dimensions.  Returns 80×24 on failure.
+    static void queryTermSize(int& w, int& h) {
+        struct winsize ws{};
+        if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 &&
+            ws.ws_col > 0 && ws.ws_row > 0) {
+            w = ws.ws_col;
+            h = ws.ws_row;
+        } else {
+            w = 80; h = 24;
+        }
+    }
+
     void enableRawMode() {
         if (!isatty(STDIN_FILENO))
             throw std::runtime_error(
@@ -215,11 +227,23 @@ class TuiWindow : public IWindow {
         raw.c_cc[VMIN]  = 1;
         raw.c_cc[VTIME] = 0;
         tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+
+        // Enable mouse button events (X10) + SGR extended coordinates.
+        // SGR mode (\033[?1006h) handles terminals wider than 223 columns and
+        // embeds modifier keys in the button parameter (shift=4, ctrl=16).
+        const char* mouseOn = "\033[?1000h\033[?1006h";
+        tuiWrite(mouseOn, std::strlen(mouseOn));
+        std::fflush(stdout);
+
         raw_mode_ = true;
     }
 
     void disableRawMode() {
         if (raw_mode_) {
+            // Disable mouse tracking before restoring terminal mode.
+            const char* mouseOff = "\033[?1006l\033[?1000l";
+            tuiWrite(mouseOff, std::strlen(mouseOff));
+            std::fflush(stdout);
             tcsetattr(STDIN_FILENO, TCSAFLUSH, &saved_termios_);
             raw_mode_ = false;
         }
@@ -244,12 +268,91 @@ class TuiWindow : public IWindow {
         return (int)c;
     }
 
+    // Parse an SGR mouse event that started with ESC [ < …
+    // Returns a valid MouseEvent or sets event.button=0 on parse failure.
+    MouseEvent parseSgrMouse() {
+        // Accumulate digits and semicolons until 'M' (press) or 'm' (release).
+        std::string seq;
+        for (int i = 0; i < 32; ++i) {
+            int b = readByte(100);
+            if (b < 0) break;
+            seq += (char)b;
+            if (b == 'M' || b == 'm') break;
+        }
+        if (seq.empty()) return {};
+
+        // Parse: Pb;Px;Py{M|m}
+        int pb = 0, px = 0, py = 0;
+        char terminator = 0;
+        // Simple manual parse — no sscanf to stay dependency-free.
+        size_t i = 0;
+        while (i < seq.size() && seq[i] >= '0' && seq[i] <= '9')
+            pb = pb * 10 + (seq[i++] - '0');
+        if (i < seq.size() && seq[i] == ';') ++i;
+        while (i < seq.size() && seq[i] >= '0' && seq[i] <= '9')
+            px = px * 10 + (seq[i++] - '0');
+        if (i < seq.size() && seq[i] == ';') ++i;
+        while (i < seq.size() && seq[i] >= '0' && seq[i] <= '9')
+            py = py * 10 + (seq[i++] - '0');
+        if (i < seq.size()) terminator = seq[i];
+
+        // Button encoding: bit0-1 = button (0=left,1=mid,2=right),
+        // bit2 = shift, bit3 = meta, bit4 = ctrl, bit5 = motion,
+        // bit6 = wheel (64=up, 65=down).
+        MouseEvent me{};
+        me.x       = px - 1;   // convert from 1-based to 0-based
+        me.y       = py - 1;
+        me.pressed = (terminator == 'M');
+        me.shift   = (pb & 4) != 0;
+
+        int btn = pb & 3;
+        if (pb & 64) {
+            // Wheel event
+            me.button  = (pb & 1) ? 5 : 4;  // 64=up→4, 65=down→5
+            me.pressed = true;
+        } else {
+            me.button = btn + 1;  // 1=left, 2=middle, 3=right
+        }
+        return me;
+    }
+
+    // Parse a legacy X10 mouse event that started with ESC [ M
+    MouseEvent parseLegacyMouse() {
+        int b  = readByte(100);
+        int px = readByte(100);
+        int py = readByte(100);
+        if (b < 0 || px < 0 || py < 0) return {};
+
+        MouseEvent me{};
+        // Legacy encoding: button byte = button_code + 32 + modifiers
+        // button_code: 0=left, 1=mid, 2=right, 64=wheel-up, 65=wheel-down
+        int pb   = b - 32;
+        me.x     = px - 33;  // 33 = 32 (offset) + 1 (1-based)
+        me.y     = py - 33;
+        me.shift = (pb & 4) != 0;
+        if (pb & 64) {
+            me.button  = (pb & 1) ? 5 : 4;
+            me.pressed = true;
+        } else {
+            int btn    = pb & 3;
+            me.button  = (btn == 3) ? 0 : btn + 1;  // btn==3 means release in X10
+            me.pressed = (btn != 3);
+        }
+        return me;
+    }
+
     // Parse one KeyEvent from the POSIX raw byte stream.
     // Handles ANSI escape sequences, Ctrl+letter, and ASCII printable chars.
+    // When a mouse event is detected, fires mcb_ and returns a null KeyEvent.
     // Returns a synthetic Ctrl+Q on EOF or Ctrl+D / Ctrl+Q input.
-    KeyEvent posixReadKey() {
-        int c = readByte();
+    KeyEvent posixReadKey(int timeout_ms = -1) {
+        int c = readByte(timeout_ms);
         KeyEvent ke{};
+
+        // Timed poll with no input: return a null event.
+        if (c < 0 && timeout_ms >= 0) {
+            return {};
+        }
 
         // EOF, Ctrl+D (4), or Ctrl+Q (17) → quit sentinel
         if (c < 0 || c == 4 || c == 17) {
@@ -269,6 +372,16 @@ class TuiWindow : public IWindow {
                 int c3 = readByte(50);
                 if (c3 < 0) {
                     ke.key = KEY_ESC;
+                } else if (c3 == '<') {
+                    // SGR mouse event: ESC [ < Pb ; Px ; Py {M|m}
+                    MouseEvent me = parseSgrMouse();
+                    if (me.button > 0 && mcb_) mcb_(me);
+                    return {};  // null KeyEvent — will be skipped by run()
+                } else if (c3 == 'M') {
+                    // Legacy X10 mouse event: ESC [ M b px py
+                    MouseEvent me = parseLegacyMouse();
+                    if (me.button > 0 && mcb_) mcb_(me);
+                    return {};
                 } else if (c3 >= '0' && c3 <= '9') {
                     // Numeric parameter, e.g. ESC[3~ or ESC[1;5A
                     int n  = c3 - '0';
@@ -387,10 +500,21 @@ class TuiWindow : public IWindow {
         out += buf;
     }
 
+    static constexpr const char* ANSI_CLEAR_SCREEN = "\033[2J";
+
     // Write one character + colour into the back-buffer (bounds-checked).
     void bufWrite(int col, int row, char ch, Color fg, Color bg) {
-        if (row < 0 || row >= SCR_H || col < 0 || col >= SCR_W) return;
-        buf_[row][col] = {ch, fg, bg};
+        if (row < 0 || row >= scr_h_ || col < 0 || col >= scr_w_) return;
+        buf_[row * scr_w_ + col] = {ch, fg, bg};
+    }
+
+    // Resize the back-buffer to match the current terminal dimensions.
+    void resizeBuf(int w, int h) {
+        scr_w_  = w;
+        scr_h_  = h;
+        buf_.assign(static_cast<std::size_t>(w * h), ScreenCell{});
+        prev_.assign(static_cast<std::size_t>(w * h), ScreenCell{});
+        first_frame_ = true;
     }
 
 public:
@@ -399,6 +523,22 @@ public:
     // -----------------------------------------------------------------------
     TuiWindow() {
         enableRawMode();
+
+        // Initialise the back-buffer to the current terminal size.
+#ifdef _WIN32
+        {
+            CONSOLE_SCREEN_BUFFER_INFO csbi{};
+            if (GetConsoleScreenBufferInfo(hOut_, &csbi)) {
+                int w = csbi.srWindow.Right  - csbi.srWindow.Left + 1;
+                int h = csbi.srWindow.Bottom - csbi.srWindow.Top  + 1;
+                if (w > 0 && h > 0) { scr_w_ = w; scr_h_ = h; }
+            }
+        }
+#else
+        queryTermSize(scr_w_, scr_h_);
+#endif
+        resizeBuf(scr_w_, scr_h_);
+
         // Hide cursor and clear the screen before the first frame.
         const char* setup = "\033[?25l\033[2J";
         tuiWrite(setup, std::strlen(setup));
@@ -414,15 +554,21 @@ public:
     }
 
     // -----------------------------------------------------------------------
-    // IWindow drawing interface
+    // IWindow interface
     // -----------------------------------------------------------------------
+
+    void getTermSize(int& rows, int& cols) const override {
+        rows = scr_h_;
+        cols = scr_w_;
+    }
 
     // Write text at (x, y), preserving per-cell background already in buf_.
     void drawText(int x, int y, const std::string& t, Color fg) override {
         for (int i = 0; i < (int)t.size(); ++i) {
             int cx = x + i;
-            Color bg = (y >= 0 && y < SCR_H && cx >= 0 && cx < SCR_W)
-                       ? buf_[y][cx].bg
+            int idx = y * scr_w_ + cx;
+            Color bg = (y >= 0 && y < scr_h_ && cx >= 0 && cx < scr_w_)
+                       ? buf_[static_cast<std::size_t>(idx)].bg
                        : Color{255, 255, 255};
             bufWrite(cx, y, t[i], fg, bg);
         }
@@ -461,6 +607,7 @@ public:
     }
 
     // Blit the back-buffer to the terminal, writing only changed cells.
+    // Also checks for a terminal resize (handled on the next render cycle).
     void updateDisplay() override {
         std::string out;
         out.reserve(4096);
@@ -469,12 +616,13 @@ public:
         Color cur_fg{255, 0, 255};   // deliberately invalid initial value
         Color cur_bg{255, 0, 255};
 
-        for (int r = 0; r < SCR_H; ++r) {
-            for (int c = 0; c < SCR_W; ++c) {
-                const ScreenCell& cell = buf_[r][c];
+        for (int r = 0; r < scr_h_; ++r) {
+            for (int c = 0; c < scr_w_; ++c) {
+                std::size_t idx = static_cast<std::size_t>(r * scr_w_ + c);
+                const ScreenCell& cell = buf_[idx];
 
                 // Skip cells that haven't changed since the last frame.
-                if (!first_frame_ && cell == prev_[r][c]) continue;
+                if (!first_frame_ && cell == prev_[idx]) continue;
 
                 appendMoveTo(out, c, r);
 
@@ -487,13 +635,13 @@ public:
                 }
 
                 out += cell.ch;
-                prev_[r][c] = cell;
+                prev_[idx] = cell;
             }
         }
 
-        // Reset attributes and park cursor at bottom-left.
+        // Reset attributes and park cursor below the grid.
         out += "\033[0m";
-        appendMoveTo(out, 0, SCR_H);
+        appendMoveTo(out, 0, scr_h_);
 
         if (!out.empty()) {
             tuiWrite(out.data(), out.size());
@@ -501,6 +649,20 @@ public:
         }
 
         first_frame_ = false;
+
+        // Check if the terminal was resized; update buffers for the next frame.
+#ifndef _WIN32
+        {
+            int nw = 80, nh = 24;
+            queryTermSize(nw, nh);
+            if (nw != scr_w_ || nh != scr_h_) {
+                resizeBuf(nw, nh);
+                // Clear screen so the next full repaint covers the new size.
+                tuiWrite(ANSI_CLEAR_SCREEN, std::strlen(ANSI_CLEAR_SCREEN));
+                std::fflush(stdout);
+            }
+        }
+#endif
     }
 
     void handleInput(std::function<void(KeyEvent)> f) override {
@@ -513,7 +675,8 @@ public:
     // -----------------------------------------------------------------------
     // run()  —  the terminal event loop
     //
-    // Reads one key event at a time and fires the registered callback.
+    // Reads one event at a time and fires the registered callback.
+    // Mouse events are fired from within posixReadKey / winReadKey.
     // Ctrl+Q or Ctrl+D exits the loop.
     // -----------------------------------------------------------------------
     void run() override {
@@ -523,9 +686,21 @@ public:
             // Ctrl+Q or Ctrl+D exits.
             if (ke.ctrl && (ke.ch == 'q' || ke.ch == 'd')) break;
 #else
-            KeyEvent ke = posixReadKey();
-            // posixReadKey() returns ctrl+q as the quit sentinel.
+            constexpr int RESIZE_POLL_TIMEOUT_MS = 100;
+            KeyEvent ke = posixReadKey(RESIZE_POLL_TIMEOUT_MS);
+            // Keep the UI responsive to terminal window resize even when idle.
+            int nw, nh;
+            queryTermSize(nw, nh);
+            if (nw != scr_w_ || nh != scr_h_) {
+                resizeBuf(nw, nh);
+                tuiWrite(ANSI_CLEAR_SCREEN, std::strlen(ANSI_CLEAR_SCREEN));
+                std::fflush(stdout);
+                if (kcb_) kcb_(KeyEvent{});
+            }
+            // posixReadKey() returns ctrl+q as the quit sentinel,
+            // or a null event (key==0, ch==0) for mouse events.
             if (ke.ctrl && ke.ch == 'q') break;
+            if (ke.key == 0 && ke.ch == 0) continue;  // mouse event — already fired
 #endif
             if (kcb_) kcb_(ke);
         }

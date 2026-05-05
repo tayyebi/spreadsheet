@@ -69,7 +69,7 @@ static std::string fitR(const std::string& s, int w) {
 // App::renderToolbar()  —  row 0: key-shortcut help line
 // ---------------------------------------------------------------------------
 void App::renderToolbar() {
-    int W = HW + Spreadsheet::COLS * CW;
+    int W = termCols_;
     win_.fillRect(0, 0, W, TB, C_TB_BG);
 
     static const char HELP[] =
@@ -86,7 +86,7 @@ void App::renderToolbar() {
 // App::renderFormulaBar()  —  row TB (=1): cell-name | formula content
 // ---------------------------------------------------------------------------
 void App::renderFormulaBar() {
-    int W = HW + Spreadsheet::COLS * CW;
+    int W = termCols_;
     int Y = TB;  // row index of formula bar
 
     win_.fillRect(0, Y, W, FB, C_BG);
@@ -108,7 +108,7 @@ void App::renderFormulaBar() {
 }
 
 // ---------------------------------------------------------------------------
-// App::renderGrid()  —  column headers + all data rows
+// App::renderGrid()  —  column headers + visible data rows (viewport)
 // ---------------------------------------------------------------------------
 void App::renderGrid() {
     constexpr int GY = TB + FB;  // row index of column-header line
@@ -117,15 +117,19 @@ void App::renderGrid() {
     selRect(sr0, sr1, sc0, sc1);
     bool multiSel = (sr0 != sr1 || sc0 != sc1);
 
+    int visR = visibleRows();
+    int visC = visibleCols();
+
     // ---- Column-header row ------------------------------------------------
     // Corner cell (top-left blank area)
     win_.fillRect(0, GY, HW, HH, C_HDR_BG);
     win_.drawText(HW - 1, GY, "|", C_GR);
 
-    for (int c = 0; c < Spreadsheet::COLS; ++c) {
-        int    x    = HW + c * CW;
-        bool   inR  = (c >= sc0 && c <= sc1);
-        Color  hbg  = inR ? C_HDR_HL : C_HDR_BG;
+    for (int vi = 0; vi < visC; ++vi) {
+        int c    = viewCol_ + vi;
+        int x    = HW + vi * CW;
+        bool inR = (c >= sc0 && c <= sc1);
+        Color hbg = inR ? C_HDR_HL : C_HDR_BG;
 
         win_.fillRect(x, GY, CW, HH, hbg);
 
@@ -137,16 +141,18 @@ void App::renderGrid() {
     }
 
     // ---- Data rows --------------------------------------------------------
-    for (int r = 0; r < Spreadsheet::ROWS; ++r) {
-        int  y       = GY + HH + r * CH;
-        bool rowInR  = (r >= sr0 && r <= sr1);
+    for (int vi = 0; vi < visR; ++vi) {
+        int r    = viewRow_ + vi;
+        int y    = GY + HH + vi * CH;
+        bool rowInR = (r >= sr0 && r <= sr1);
 
         // Row-number header
         win_.fillRect(0, y, HW, CH, rowInR ? C_HDR_HL : C_HDR_BG);
         win_.drawText(0, y, fitR(std::to_string(r + 1), HW - 1) + '|', C_TXT);
 
-        for (int c = 0; c < Spreadsheet::COLS; ++c) {
-            int  x        = HW + c * CW;
+        for (int ci = 0; ci < visC; ++ci) {
+            int c        = viewCol_ + ci;
+            int x        = HW + ci * CW;
             bool isCursor = (r == selRow_ && c == selCol_);
             bool inRange  = multiSel && rowInR && (c >= sc0 && c <= sc1);
 
@@ -179,6 +185,7 @@ void App::renderGrid() {
 // App::render()
 // ---------------------------------------------------------------------------
 void App::render() {
+    win_.getTermSize(termRows_, termCols_);
     renderToolbar();
     renderFormulaBar();
     renderGrid();

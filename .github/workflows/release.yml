@@ -15,7 +15,7 @@ jobs:
             binary: build/spreadsheet
           - os: windows-latest
             artifact: spreadsheet-windows
-            binary: build/Release/spreadsheet.exe
+            binary: build/MinSizeRel/spreadsheet.exe
           - os: macos-latest
             artifact: spreadsheet-macos
             binary: build/spreadsheet
@@ -26,9 +26,12 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libx11-dev
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -DCMAKE_BUILD_TYPE=MinSizeRel
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build build --config MinSizeRel
+      - name: Strip binary
+        if: runner.os != 'Windows'
+        run: strip ${{ matrix.binary }}
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
