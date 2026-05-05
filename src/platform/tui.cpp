@@ -691,8 +691,8 @@ public:
             queryTermSize(nw, nh);
             if (nw != scr_w_ || nh != scr_h_) {
                 resizeBuf(nw, nh);
-                const char* clr = "\033[2J";
-                tuiWrite(clr, std::strlen(clr));
+                const char* clearScreenSequence = "\033[2J";
+                tuiWrite(clearScreenSequence, std::strlen(clearScreenSequence));
                 std::fflush(stdout);
                 if (kcb_) kcb_(KeyEvent{});
             }
