@@ -1,5 +1,5 @@
 name: CI
-on: [push,pull_request] # trigger
+on: [push] # trigger
 permissions:
   contents: read # min perms
 jobs:
@@ -19,9 +19,6 @@ jobs:
     runs-on: ${{ matrix.os }} # runner
     steps:
       - uses: actions/checkout@v4 # checkout
-      - name: X11 deps
-        if: runner.os == 'Linux' # linux only
-        run: sudo apt-get update && sudo apt-get install -y libx11-dev # install
       - name: Configure
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release # config
       - name: Build

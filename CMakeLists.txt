@@ -1,5 +1,5 @@
 # ==============================================================================
-# CMakeLists.txt  —  Build configuration for the cross-platform spreadsheet app
+# CMakeLists.txt  —  Build configuration for the terminal-UI spreadsheet app
 #
 # Requires CMake 3.20+ for modern target-based API support.
 # Build steps:
@@ -23,13 +23,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 #   formula/     — lexer, parser, AST
 #   formula/functions/ — one file per spreadsheet function (SUM, AVERAGE, …)
 #   app/         — application controller (rendering, key handling)
-#   platform/    — OS-specific window implementation (selected below)
+#   platform/    — terminal UI implementation (tui.cpp, no external libraries)
 # ------------------------------------------------------------------------------
 set(SOURCES
     # Core data model — one source file per responsibility:
     src/core/spreadsheet.cpp   # grid storage and formula evaluation
     src/core/csv.cpp           # CSV (RFC-4180) persistence
-    src/core/ods.cpp           # OpenDocument Spreadsheet (.ods) persistence
+    src/core/ods.cpp           # Custom binary SSHEET persistence
     src/formula/formula.cpp
     # Shared helpers used by every formula function:
     src/formula/functions/function_base.cpp
@@ -51,37 +51,14 @@ set(SOURCES
     src/app/renderer.cpp       # App::render()
     src/app/keyboard.cpp       # App::onKey()
     src/app/mouse.cpp          # App::onMouse()
+    # Platform: single terminal-UI backend (ANSI + POSIX termios, no GUI libs)
+    src/platform/tui.cpp
 )
-
-# ------------------------------------------------------------------------------
-# Platform selection
-#
-# We compile exactly one platform backend based on the target OS.
-# Each backend implements the IWindow interface declared in platform.h.
-# ------------------------------------------------------------------------------
-if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    list(APPEND SOURCES src/platform/win32.cpp)
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    list(APPEND SOURCES src/platform/macos.mm)
-    # macos.mm is Objective-C++; we must enable the OBJCXX language so CMake
-    # uses the Objective-C++ compiler (clang++ with -x objective-c++) for it.
-    enable_language(OBJCXX)
-else()
-    # Assume Linux / other Unix with X11.
-    list(APPEND SOURCES src/platform/x11.cpp)
-endif()
 
 # ------------------------------------------------------------------------------
 # Executable target
 # ------------------------------------------------------------------------------
 add_executable(spreadsheet ${SOURCES})
-
-# On Windows the entry point is WinMain (a GUI subsystem executable), not main.
-# Without WIN32_EXECUTABLE the linker generates a console application and looks
-# for main(), causing LNK2019 "unresolved external symbol main".
-if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    set_target_properties(spreadsheet PROPERTIES WIN32_EXECUTABLE TRUE)
-endif()
 
 # Each sub-directory is added as a separate include path so that files within
 # a layer can include their own headers without path prefixes, e.g.:
@@ -103,22 +80,4 @@ if(MSVC)
     target_compile_options(spreadsheet PRIVATE /W4)
 else()
     target_compile_options(spreadsheet PRIVATE -Wall -Wextra -Wpedantic)
-endif()
-
-# ------------------------------------------------------------------------------
-# Platform-specific linker dependencies
-# ------------------------------------------------------------------------------
-if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    # user32 — window management (CreateWindowEx, MessageLoop, …)
-    # gdi32  — graphics device interface (BitBlt, CreatePen, …)
-    target_link_libraries(spreadsheet PRIVATE user32 gdi32)
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    # The Cocoa framework provides NSApplication, NSWindow, NSView, etc.
-    target_link_libraries(spreadsheet PRIVATE "-framework Cocoa")
-else()
-    # libX11 — the client-side X11 library (XOpenDisplay, XCreateWindow, …)
-    target_link_libraries(spreadsheet PRIVATE X11)
-    # Statically bundle the C++ runtime so the binary does not depend on the
-    # host system's libstdc++/libgcc version (avoids GLIBCXX_x.y.z not found).
-    target_link_options(spreadsheet PRIVATE -static-libstdc++ -static-libgcc)
 endif()

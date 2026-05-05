@@ -30,13 +30,13 @@ public:
     void onMouse(MouseEvent e);
 
     // -----------------------------------------------------------------------
-    // Layout constants (pixels) — public so platform files can compute the
-    // required window size without duplicating magic numbers.
+    // Layout constants (characters) — all values are in terminal character
+    // units (columns / lines) rather than pixels.
     // -----------------------------------------------------------------------
-    static constexpr int CW = 100, CH = 25;   // cell width / height
-    static constexpr int HW =  40, HH = 20;   // row-header width / col-header height
-    static constexpr int TB =  32;             // toolbar strip height
-    static constexpr int FB =  25;             // formula-bar strip height
+    static constexpr int CW = 10, CH = 1;   // cell width (chars) / height (lines)
+    static constexpr int HW =  5, HH = 1;   // row-header width / col-header height
+    static constexpr int TB =  1;            // toolbar strip height (lines)
+    static constexpr int FB =  1;            // formula-bar strip height (lines)
 
 private:
     IWindow&    win_;          // non-owning reference to the platform window
