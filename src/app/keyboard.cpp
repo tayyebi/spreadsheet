@@ -108,6 +108,8 @@ void App::onKey(KeyEvent e) {
 
         } else if (e.key == IWindow::KEY_END && e.ctrl) {
             int lastR = 0, lastC = 0;
+            // forEachCell visits all sparse-map entries, including cells set to ""
+            // via setCellWithUndo(r,c,""). We only want cells with actual content.
             sheet_.forEachCell([&](int r, int c, const Cell& cell) {
                 if (!cell.raw.empty()) {
                     if (r > lastR || (r == lastR && c > lastC)) { lastR = r; lastC = c; }

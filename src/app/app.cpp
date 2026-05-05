@@ -270,6 +270,8 @@ void App::toolbarAction(int idx) {
     const std::string& lbl = toolBtns_[idx].label;
 
     if (lbl == "New") {
+        // forEachCell visits sparse-map entries, including cells cleared to "".
+        // Only push undo entries for cells that currently hold real content.
         sheet_.forEachCell([&](int r, int c, const Cell& cell) {
             if (!cell.raw.empty())
                 setCellWithUndo(r, c, "");

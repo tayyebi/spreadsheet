@@ -45,7 +45,7 @@ bool saveCSV(const Spreadsheet& sheet, const std::string& path) {
         }
     });
 
-    if (maxR < 0) return true;  // nothing to write
+    if (maxR < 0) return true;  // grid has no non-empty cells — nothing to write
 
     std::ofstream f(path);
     if (!f) return false;
