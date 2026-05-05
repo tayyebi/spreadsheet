@@ -687,16 +687,14 @@ public:
 #else
             KeyEvent ke = posixReadKey(100);
             // Keep the UI responsive to terminal window resize even when idle.
-            {
-                int nw = 80, nh = 24;
-                queryTermSize(nw, nh);
-                if (nw != scr_w_ || nh != scr_h_) {
-                    resizeBuf(nw, nh);
-                    const char* clr = "\033[2J";
-                    tuiWrite(clr, std::strlen(clr));
-                    std::fflush(stdout);
-                    if (kcb_) kcb_(KeyEvent{});
-                }
+            int nw, nh;
+            queryTermSize(nw, nh);
+            if (nw != scr_w_ || nh != scr_h_) {
+                resizeBuf(nw, nh);
+                const char* clr = "\033[2J";
+                tuiWrite(clr, std::strlen(clr));
+                std::fflush(stdout);
+                if (kcb_) kcb_(KeyEvent{});
             }
             // posixReadKey() returns ctrl+q as the quit sentinel,
             // or a null event (key==0, ch==0) for mouse events.
