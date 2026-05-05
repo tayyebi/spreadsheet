@@ -3,7 +3,7 @@
 A terminal-based spreadsheet application with no GUI library dependencies.
 
 ## Features
-- 20 × 10 grid with formula evaluation (SUM, AVG, MIN, MAX, COUNT, IF, ABS, ROUND, SQRT, POWER)
+- 20 × 10 grid with formula evaluation (including SUM/AVERAGE/MIN/MAX/COUNT/IF, math + trig, logical, and statistical functions)
 - Keyboard navigation and cell editing
 - Undo / redo, copy / cut / paste, fill-down / fill-right
 - CSV save (`Ctrl+S`) and load (`Ctrl+O`)
