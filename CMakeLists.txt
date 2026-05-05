@@ -89,7 +89,13 @@ else()
     target_compile_options(spreadsheet PRIVATE
         $<$<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>>:-ffunction-sections -fdata-sections>
     )
-    target_link_options(spreadsheet PRIVATE
-        $<$<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>>:-Wl,--gc-sections>
-    )
+    if(APPLE)
+        target_link_options(spreadsheet PRIVATE
+            $<$<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>>:-Wl,-dead_strip>
+        )
+    else()
+        target_link_options(spreadsheet PRIVATE
+            $<$<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>>:-Wl,--gc-sections>
+        )
+    endif()
 endif()
