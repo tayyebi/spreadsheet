@@ -685,14 +685,15 @@ public:
             // Ctrl+Q or Ctrl+D exits.
             if (ke.ctrl && (ke.ch == 'q' || ke.ch == 'd')) break;
 #else
-            KeyEvent ke = posixReadKey(100);
+            constexpr int RESIZE_POLL_TIMEOUT_MS = 100;
+            KeyEvent ke = posixReadKey(RESIZE_POLL_TIMEOUT_MS);
             // Keep the UI responsive to terminal window resize even when idle.
             int nw, nh;
             queryTermSize(nw, nh);
             if (nw != scr_w_ || nh != scr_h_) {
                 resizeBuf(nw, nh);
-                const char* clearScreenSequence = "\033[2J";
-                tuiWrite(clearScreenSequence, std::strlen(clearScreenSequence));
+                const char* clear_screen_sequence = "\033[2J";
+                tuiWrite(clear_screen_sequence, std::strlen(clear_screen_sequence));
                 std::fflush(stdout);
                 if (kcb_) kcb_(KeyEvent{});
             }
