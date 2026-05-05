@@ -69,17 +69,14 @@ bool saveODS(const Spreadsheet& sheet, const std::string& path) {
     std::vector<CellRecord> cells;
     cells.reserve(64);
 
-    for (int r = 0; r < Spreadsheet::ROWS; ++r) {
-        for (int c = 0; c < Spreadsheet::COLS; ++c) {
-            const Cell* cell = sheet.getCell(r, c);
-            if (cell && !cell->raw.empty())
-                cells.push_back({
-                    static_cast<uint32_t>(r),
-                    static_cast<uint32_t>(c),
-                    cell->raw
-                });
-        }
-    }
+    sheet.forEachCell([&](int r, int c, const Cell& cell) {
+        if (!cell.raw.empty())
+            cells.push_back({
+                static_cast<uint32_t>(r),
+                static_cast<uint32_t>(c),
+                cell.raw
+            });
+    });
 
     std::ofstream f(path, std::ios::binary);
     if (!f) return false;
@@ -117,11 +114,8 @@ bool loadODS(Spreadsheet& sheet, const std::string& path) {
     uint32_t count = 0;
     if (!readLE32(f, count)) return false;
 
-    // Guard against malformed/huge counts (more cells than the grid can hold)
-    const uint32_t kMaxCells =
-        static_cast<uint32_t>(Spreadsheet::ROWS) *
-        static_cast<uint32_t>(Spreadsheet::COLS);
-    if (count > kMaxCells) return false;
+    // Guard against malformed/huge counts
+    if (count > 16000000u) return false;  // 16 M cells is a reasonable sanity limit
 
     sheet.clear();
 
@@ -131,9 +125,9 @@ bool loadODS(Spreadsheet& sheet, const std::string& path) {
         if (!readLE32(f, col)) return false;
         if (!readLE32(f, len)) return false;
 
-        // Bounds check
-        if (row >= static_cast<uint32_t>(Spreadsheet::ROWS) ||
-            col >= static_cast<uint32_t>(Spreadsheet::COLS))
+        // Bounds check against the maximum addressable grid
+        if (row >= static_cast<uint32_t>(Spreadsheet::MAX_ROWS) ||
+            col >= static_cast<uint32_t>(Spreadsheet::MAX_COLS))
             return false;
 
         // Guard against absurdly large content lengths (e.g. corrupted file)

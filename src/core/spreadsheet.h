@@ -21,9 +21,10 @@
 
 class Spreadsheet {
 public:
-    // Grid dimensions are compile-time constants shared across all layers.
-    static constexpr int ROWS = 20;  // rows  0..19
-    static constexpr int COLS = 10;  // columns 0..9
+    // Maximum addressable grid extents (sanity / bounds-check limits only).
+    // The actual "active" grid size is managed by the App layer.
+    static constexpr int MAX_ROWS = 1048576;  // ~1 million rows  (2^20)
+    static constexpr int MAX_COLS =   16384;  // ~16 K columns    (2^14)
 
     // -----------------------------------------------------------------------
     // key()  —  pack (row, col) into one 64-bit integer
@@ -46,6 +47,14 @@ public:
 
     // Remove all cell data (used by persistence loaders before populating).
     void clear();
+
+    // Iterate every non-empty cell.  fn receives (row, col, cell).
+    // Order of iteration is unspecified (sparse-map order).
+    template<typename F>
+    void forEachCell(F&& fn) const {
+        for (const auto& [k, cell] : cells_)
+            fn(int(k >> 32), int(k & 0xFFFFFFFFu), cell);
+    }
 
     // -- Evaluation ----------------------------------------------------------
 

@@ -86,16 +86,56 @@ void App::cancelEdit() {
 
 // ---------------------------------------------------------------------------
 // App::moveSel()  —  move the active cell, optionally extending the range
+//
+// Auto-expands the grid when the cursor tries to move past the last row/col,
+// then scrolls the viewport so the cursor is always visible.
 // ---------------------------------------------------------------------------
 void App::moveSel(int dr, int dc, bool shift) {
-    int nr = clampRow(selRow_ + dr);
-    int nc = clampCol(selCol_ + dc);
-    selRow_ = nr;
-    selCol_ = nc;
-    if (!shift) {
-        anchorRow_ = nr;
-        anchorCol_ = nc;
+    // Attempt the raw move first so we know if we're hitting the boundary.
+    int nr = selRow_ + dr;
+    int nc = selCol_ + dc;
+
+    // Auto-expand rows when the cursor steps past the last row.
+    if (dr > 0 && nr >= rows_) {
+        int newRows = rows_ + GROW_ROWS;
+        if (newRows > Spreadsheet::MAX_ROWS) newRows = Spreadsheet::MAX_ROWS;
+        rows_ = newRows;
     }
+    // Auto-expand cols when the cursor steps past the last column.
+    if (dc > 0 && nc >= cols_) {
+        int newCols = cols_ + GROW_COLS;
+        if (newCols > Spreadsheet::MAX_COLS) newCols = Spreadsheet::MAX_COLS;
+        cols_ = newCols;
+    }
+
+    selRow_ = clampRow(nr);
+    selCol_ = clampCol(nc);
+    if (!shift) {
+        anchorRow_ = selRow_;
+        anchorCol_ = selCol_;
+    }
+    scrollToSel();
+}
+
+// ---------------------------------------------------------------------------
+// App::scrollToSel()  —  adjust the viewport so the cursor cell is visible
+// ---------------------------------------------------------------------------
+void App::scrollToSel() {
+    int vr = visibleRows();
+    int vc = visibleCols();
+
+    if (selRow_ < viewRow_)
+        viewRow_ = selRow_;
+    else if (selRow_ >= viewRow_ + vr)
+        viewRow_ = selRow_ - vr + 1;
+
+    if (selCol_ < viewCol_)
+        viewCol_ = selCol_;
+    else if (selCol_ >= viewCol_ + vc)
+        viewCol_ = selCol_ - vc + 1;
+
+    if (viewRow_ < 0) viewRow_ = 0;
+    if (viewCol_ < 0) viewCol_ = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -108,14 +148,14 @@ void App::jumpEdge(int dr, int dc, bool shift) {
     if (curEmpty) {
         while (true) {
             int nr = r + dr, nc = c + dc;
-            if (nr < 0 || nr >= Spreadsheet::ROWS || nc < 0 || nc >= Spreadsheet::COLS) break;
+            if (nr < 0 || nr >= rows_ || nc < 0 || nc >= cols_) break;
             r = nr; c = nc;
             if (!rawOf(r, c).empty()) break;
         }
     } else {
         while (true) {
             int nr = r + dr, nc = c + dc;
-            if (nr < 0 || nr >= Spreadsheet::ROWS || nc < 0 || nc >= Spreadsheet::COLS) break;
+            if (nr < 0 || nr >= rows_ || nc < 0 || nc >= cols_) break;
             if (rawOf(nr, nc).empty()) break;
             r = nr; c = nc;
         }
@@ -124,6 +164,7 @@ void App::jumpEdge(int dr, int dc, bool shift) {
     selRow_ = clampRow(r);
     selCol_ = clampCol(c);
     if (!shift) { anchorRow_ = selRow_; anchorCol_ = selCol_; }
+    scrollToSel();
 }
 
 // ---------------------------------------------------------------------------
@@ -229,10 +270,10 @@ void App::toolbarAction(int idx) {
     const std::string& lbl = toolBtns_[idx].label;
 
     if (lbl == "New") {
-        for (int r = 0; r < Spreadsheet::ROWS; ++r)
-            for (int c = 0; c < Spreadsheet::COLS; ++c)
-                if (!rawOf(r, c).empty())
-                    setCellWithUndo(r, c, "");
+        sheet_.forEachCell([&](int r, int c, const Cell& cell) {
+            if (!cell.raw.empty())
+                setCellWithUndo(r, c, "");
+        });
         sheet_.evaluateAll();
     } else if (lbl == "Open") {
         loadCSV(sheet_, "spreadsheet.csv");

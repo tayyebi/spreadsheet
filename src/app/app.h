@@ -38,9 +38,39 @@ public:
     static constexpr int TB =  1;            // toolbar strip height (lines)
     static constexpr int FB =  1;            // formula-bar strip height (lines)
 
+    // -----------------------------------------------------------------------
+    // Dynamic grid size constants
+    // -----------------------------------------------------------------------
+    static constexpr int INIT_ROWS = 1000;   // starting row count
+    static constexpr int INIT_COLS =  100;   // starting column count
+    static constexpr int GROW_ROWS = 1000;   // rows added when reaching the end
+    static constexpr int GROW_COLS =  100;   // columns added when reaching the end
+
 private:
     IWindow&    win_;          // non-owning reference to the platform window
     Spreadsheet sheet_;        // the data model (cells, formulas, values)
+
+    // -----------------------------------------------------------------------
+    // Dynamic grid dimensions — grow when the user navigates past the edge
+    // -----------------------------------------------------------------------
+    int rows_ = INIT_ROWS;
+    int cols_ = INIT_COLS;
+
+    // -----------------------------------------------------------------------
+    // Viewport — the top-left cell currently shown in the grid area
+    // -----------------------------------------------------------------------
+    int viewRow_ = 0;
+    int viewCol_ = 0;
+
+    // -----------------------------------------------------------------------
+    // Cached terminal size (refreshed at the start of every render() call)
+    // -----------------------------------------------------------------------
+    int termRows_ = 24;
+    int termCols_ = 80;
+
+    // Number of data rows / columns visible given the current terminal size.
+    int visibleRows() const { return std::max(1, termRows_ - (TB + FB + HH)); }
+    int visibleCols() const { return std::max(1, (termCols_ - HW) / CW); }
 
     // -----------------------------------------------------------------------
     // Selection state
@@ -106,11 +136,16 @@ private:
 
     // Move selection by (dr, dc).  If shift is held, extend the range;
     // otherwise collapse to a single cell at the new position.
+    // When the cursor reaches the last row/col the grid is auto-expanded.
+    // The viewport is scrolled to keep the cursor visible.
     void moveSel(int dr, int dc, bool shift);
 
     // Clamp r/c to valid grid coordinates.
-    static int clampRow(int r) { return r < 0 ? 0 : (r >= Spreadsheet::ROWS ? Spreadsheet::ROWS - 1 : r); }
-    static int clampCol(int c) { return c < 0 ? 0 : (c >= Spreadsheet::COLS ? Spreadsheet::COLS - 1 : c); }
+    int clampRow(int r) const { return r < 0 ? 0 : (r >= rows_ ? rows_ - 1 : r); }
+    int clampCol(int c) const { return c < 0 ? 0 : (c >= cols_ ? cols_ - 1 : c); }
+
+    // Scroll the viewport so that (selRow_, selCol_) is visible.
+    void scrollToSel();
 
     // Jump to the edge of a data block in direction (dr, dc) (Ctrl+Arrow).
     void jumpEdge(int dr, int dc, bool shift);

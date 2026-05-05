@@ -164,10 +164,10 @@ static bool pref(const std::string& s, int& row, int& col) {
         return false;
     }
 
-    // Validate bounds: must be within the grid.
+    // Validate bounds: must be within the maximum addressable grid.
     return row >= 0 && col >= 0
-        && row < Spreadsheet::ROWS
-        && col < Spreadsheet::COLS;
+        && row < Spreadsheet::MAX_ROWS
+        && col < Spreadsheet::MAX_COLS;
 }
 
 // =============================================================================

@@ -46,15 +46,17 @@ struct KeyEvent {
 // ---------------------------------------------------------------------------
 // MouseEvent  —  a normalised mouse event
 //
-//   x, y    – cursor position in window pixels (top-left origin)
-//   button  – 1=left, 2=middle, 3=right
+//   x, y    – cursor position in terminal character cells (top-left origin)
+//   button  – 1=left, 2=middle, 3=right, 4=wheel-up, 5=wheel-down
 //   pressed – true on button press, false on button release
+//   shift   – true if the Shift modifier was held
 // ---------------------------------------------------------------------------
 struct MouseEvent {
     int  x       = 0;
     int  y       = 0;
     int  button  = 0;
     bool pressed = true;
+    bool shift   = false;
 };
 
 // ---------------------------------------------------------------------------
@@ -96,6 +98,10 @@ public:
     // Default is a no-op so platforms that do not yet implement mouse events
     // still compile without changes.
     virtual void handleMouse(std::function<void(MouseEvent)> cb) { (void)cb; }
+
+    // Return the current terminal / window dimensions in character cells.
+    // The default returns a common safe fallback (80×24).
+    virtual void getTermSize(int& rows, int& cols) const { rows = 24; cols = 80; }
 
     // Start the platform event loop.  Blocks until the window is closed.
     virtual void run() = 0;
