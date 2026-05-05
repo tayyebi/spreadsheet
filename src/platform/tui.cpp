@@ -500,6 +500,8 @@ class TuiWindow : public IWindow {
         out += buf;
     }
 
+    static constexpr const char* ANSI_CLEAR_SCREEN = "\033[2J";
+
     // Write one character + colour into the back-buffer (bounds-checked).
     void bufWrite(int col, int row, char ch, Color fg, Color bg) {
         if (row < 0 || row >= scr_h_ || col < 0 || col >= scr_w_) return;
@@ -656,8 +658,7 @@ public:
             if (nw != scr_w_ || nh != scr_h_) {
                 resizeBuf(nw, nh);
                 // Clear screen so the next full repaint covers the new size.
-                const char* clr = "\033[2J";
-                tuiWrite(clr, std::strlen(clr));
+                tuiWrite(ANSI_CLEAR_SCREEN, std::strlen(ANSI_CLEAR_SCREEN));
                 std::fflush(stdout);
             }
         }
@@ -692,8 +693,7 @@ public:
             queryTermSize(nw, nh);
             if (nw != scr_w_ || nh != scr_h_) {
                 resizeBuf(nw, nh);
-                const char* clear_screen_sequence = "\033[2J";
-                tuiWrite(clear_screen_sequence, std::strlen(clear_screen_sequence));
+                tuiWrite(ANSI_CLEAR_SCREEN, std::strlen(ANSI_CLEAR_SCREEN));
                 std::fflush(stdout);
                 if (kcb_) kcb_(KeyEvent{});
             }
