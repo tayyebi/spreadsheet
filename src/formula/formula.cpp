@@ -99,19 +99,36 @@ struct Lex {
         // Could be either a cell reference (letters + digits, e.g. A1, BC12)
         // or a function name (letters only, e.g. SUM, AVERAGE).
         // ------------------------------------------------------------------
-        if (isupper((unsigned)c)) {
-            std::string s;
-            // Consume all uppercase letters.
-            while (p < src.size() && isupper((unsigned)src[p]))
-                s += src[p++];
-            // If digits follow immediately, it's a cell reference like "A1".
-            if (p < src.size() && isdigit((unsigned)src[p])) {
-                while (p < src.size() && isdigit((unsigned)src[p]))
-                    s += src[p++];
-                return {REF, 0, s};
+        if (isalpha((unsigned)c)) {
+            const size_t start = p;
+            std::string alpha;
+            while (p < src.size() && isalpha((unsigned)src[p]))
+                alpha += char(std::toupper((unsigned char)src[p++]));
+
+            size_t q = p;
+            while (q < src.size() && isdigit((unsigned)src[q])) ++q;
+
+            // Cell refs are letters+digits not followed by function-name chars.
+            if (q > p) {
+                char next = (q < src.size()) ? src[q] : '\0';
+                if (next != '(' && next != '.' && next != '_' &&
+                    !isalpha((unsigned)next)) {
+                    std::string ref = alpha + src.substr(p, q - p);
+                    p = q;
+                    return {REF, 0, ref};
+                }
             }
-            // No trailing digits → function name like "SUM".
-            return {FUN, 0, s};
+
+            // Function names can contain letters, digits, dots, and underscores.
+            p = start;
+            std::string fn;
+            while (p < src.size()) {
+                unsigned char ch = (unsigned char)src[p];
+                if (!std::isalnum(ch) && src[p] != '.' && src[p] != '_') break;
+                fn += char(std::toupper(ch));
+                ++p;
+            }
+            return {FUN, 0, fn};
         }
 
         // ------------------------------------------------------------------
@@ -148,8 +165,9 @@ static bool pref(const std::string& s, int& row, int& col) {
     // "AA" → col=1*26+1=27, then col-- → 26
     col = 0;
     size_t i = 0;
-    while (i < s.size() && isupper((unsigned)s[i])) {
-        col = col * 26 + (s[i] - 'A' + 1);
+    while (i < s.size() && isalpha((unsigned)s[i])) {
+        char ch = char(std::toupper((unsigned char)s[i]));
+        col = col * 26 + (ch - 'A' + 1);
         ++i;
     }
     col--;  // convert from 1-based to 0-based

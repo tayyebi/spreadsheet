@@ -44,6 +44,7 @@ set(SOURCES
     src/formula/functions/round.cpp
     src/formula/functions/sqrt.cpp
     src/formula/functions/power.cpp
+    src/formula/functions/extended.cpp
     # Dispatcher: implements FunctionNode::eval() via an unordered_map lookup:
     src/formula/functions/dispatch.cpp
     # App layer — one source file per responsibility:
