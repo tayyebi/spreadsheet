@@ -345,9 +345,14 @@ class TuiWindow : public IWindow {
     // Handles ANSI escape sequences, Ctrl+letter, and ASCII printable chars.
     // When a mouse event is detected, fires mcb_ and returns a null KeyEvent.
     // Returns a synthetic Ctrl+Q on EOF or Ctrl+D / Ctrl+Q input.
-    KeyEvent posixReadKey() {
-        int c = readByte();
+    KeyEvent posixReadKey(int timeout_ms = -1) {
+        int c = readByte(timeout_ms);
         KeyEvent ke{};
+
+        // Timed poll with no input: return a null event.
+        if (c < 0 && timeout_ms >= 0) {
+            return {};
+        }
 
         // EOF, Ctrl+D (4), or Ctrl+Q (17) → quit sentinel
         if (c < 0 || c == 4 || c == 17) {
@@ -680,7 +685,19 @@ public:
             // Ctrl+Q or Ctrl+D exits.
             if (ke.ctrl && (ke.ch == 'q' || ke.ch == 'd')) break;
 #else
-            KeyEvent ke = posixReadKey();
+            KeyEvent ke = posixReadKey(100);
+            // Keep the UI responsive to terminal window resize even when idle.
+            {
+                int nw = 80, nh = 24;
+                queryTermSize(nw, nh);
+                if (nw != scr_w_ || nh != scr_h_) {
+                    resizeBuf(nw, nh);
+                    const char* clr = "\033[2J";
+                    tuiWrite(clr, std::strlen(clr));
+                    std::fflush(stdout);
+                    if (kcb_) kcb_(KeyEvent{});
+                }
+            }
             // posixReadKey() returns ctrl+q as the quit sentinel,
             // or a null event (key==0, ch==0) for mouse events.
             if (ke.ctrl && ke.ch == 'q') break;
