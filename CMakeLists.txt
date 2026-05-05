@@ -78,6 +78,18 @@ target_compile_features(spreadsheet PRIVATE cxx_std_20)
 # Enable strict warnings to catch potential bugs at compile time.
 if(MSVC)
     target_compile_options(spreadsheet PRIVATE /W4)
+    target_compile_options(spreadsheet PRIVATE
+        $<$<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>>:/O1 /Gy>
+    )
+    target_link_options(spreadsheet PRIVATE
+        $<$<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>>:/OPT:REF /OPT:ICF>
+    )
 else()
     target_compile_options(spreadsheet PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(spreadsheet PRIVATE
+        $<$<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>>:-ffunction-sections -fdata-sections>
+    )
+    target_link_options(spreadsheet PRIVATE
+        $<$<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>>:-Wl,--gc-sections>
+    )
 endif()
